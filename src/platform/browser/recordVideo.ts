@@ -4,7 +4,6 @@ import { WORKSPACE_SCALE } from '../../engine/workspaceLayout'
 
 export interface VideoOptions {
   durationMs: number
-  cycleDurationMs: number
   fps: number
   maxSide: number
   format: 'mp4' | 'webm'
@@ -87,7 +86,10 @@ export async function recordVideo(
     let animationFrame = 0
     const draw = (now: number) => {
       const elapsed = Math.min(options.durationMs, now - startedAt)
-      renderMotionFrame(context, image, elapsed % options.cycleDurationMs, settings, item => {
+      // Keep one continuous timeline. Wrapping at the nominal 2.4s base period
+      // reset each effect at an unrelated phase when its speed was fractional,
+      // causing an export-only jump that never occurs in the live preview.
+      renderMotionFrame(context, image, elapsed, settings, item => {
         renderFailure ??= item
       })
       if (renderFailure) {

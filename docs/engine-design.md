@@ -161,3 +161,6 @@ Each motion item can optionally enable a local mesh deformation independent of i
 
 
 Item sizing is a separate 0.5?2.0 multiplier applied after the motion pose, and does not alter movement strength. Spatial morph modes add fluttering edges and radial pinch/swell while keeping the fixed mesh size, so added morph options do not scale per-frame work. Guide visibility is a UI-only toggle bound to the top-row 1 key; it does not affect rendering or export.
+
+
+Video export uses the same unwrapped elapsed-time timeline as live preview. It must not reset time at the nominal 2.4-second base interval: per-item speed and preset harmonics can have non-integer periods there, which creates an export-only discontinuity. Spatial mesh rendering also crops each triangle draw to its source bounds to avoid rerasterizing the full 1920px patch for every triangle.

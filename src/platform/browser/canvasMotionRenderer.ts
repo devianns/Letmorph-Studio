@@ -89,10 +89,23 @@ function drawSpatialMesh(context: CanvasRenderingContext2D, patch: CanvasImageSo
     const by = ((b.dy - a.dy) * (c.y - a.y) - (c.dy - a.dy) * (b.y - a.y)) / det
     const dy = ((b.x - a.x) * (c.dy - a.dy) - (c.x - a.x) * (b.dy - a.dy)) / det
     const fy = a.dy - by * a.x - dy * a.y
+    const sourceLeft = Math.min(a.x, b.x, c.x)
+    const sourceTop = Math.min(a.y, b.y, c.y)
+    const sourceRight = Math.max(a.x, b.x, c.x)
+    const sourceBottom = Math.max(a.y, b.y, c.y)
+    const patchWidth = patch instanceof HTMLImageElement ? patch.naturalWidth : (patch as HTMLCanvasElement).width
+    const patchHeight = patch instanceof HTMLImageElement ? patch.naturalHeight : (patch as HTMLCanvasElement).height
+    const sourceScaleX = patchWidth / width
+    const sourceScaleY = patchHeight / height
+    const sourceWidth = (sourceRight - sourceLeft) * sourceScaleX
+    const sourceHeight = (sourceBottom - sourceTop) * sourceScaleY
     context.save()
     context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.lineTo(c.x, c.y); context.closePath(); context.clip()
     context.transform(ax, by, cx, dy, ex, fy)
-    context.drawImage(patch, 0, 0, width, height)
+    // Rasterize only this triangle's source bounds; drawing the full high-res
+    // image for every triangle made spatial morph disproportionately costly in export.
+    context.drawImage(patch, sourceLeft * sourceScaleX, sourceTop * sourceScaleY, sourceWidth, sourceHeight,
+      sourceLeft, sourceTop, sourceRight - sourceLeft, sourceBottom - sourceTop)
     context.restore()
   }
   for (let row = 0; row < divisions; row++) for (let column = 0; column < divisions; column++) {

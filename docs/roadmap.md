@@ -78,3 +78,6 @@ The product journey and implementation gates are defined in [user-flow.md](user-
 
 
 - [x] 숫자열 1 가이드 토글, 아이템 크기 배율(0.5×~2×), 모핑 펄럭임/수축 효과와 원형 펜 마커
+
+
+- [x] 익스포트에서 기본 모션과 공간 모핑의 시간축을 연속으로 유지하고, 2.4초마다 발생하던 위상 리셋 점프 수정
