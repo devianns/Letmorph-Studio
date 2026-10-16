@@ -157,10 +157,10 @@ This sequence prioritizes a simple working result without AI segmentation or adv
 
 ## Advanced spatial morphing
 
-Each motion item can optionally enable a local mesh deformation independent of its whole-item pose. Wave, bend, and radial modes use deterministic time-based displacement on a 12 by 12 mesh. Direction, strength, spatial frequency, and left-to-right strength bias are item settings and are included automatically in portable project files. The feature is disabled by default; ordinary item motion has no mesh-rendering cost.
+Each motion item can optionally enable a local mesh deformation independent of its whole-item pose. Wave, bend, radial, flutter, and pinch modes use deterministic time-based displacement on a fixed 8 by 8 mesh. Direction, strength, spatial frequency, and left-to-right strength bias are item settings and are included automatically in portable project files. The feature is disabled by default; ordinary item motion has no mesh-rendering cost.
 
 
 Item sizing is a separate 0.5?2.0 multiplier applied after the motion pose, and does not alter movement strength. Spatial morph modes add fluttering edges and radial pinch/swell while keeping the fixed mesh size, so added morph options do not scale per-frame work. Guide visibility is a UI-only toggle bound to the top-row 1 key; it does not affect rendering or export.
 
 
-Video export uses the same unwrapped elapsed-time timeline as live preview. It must not reset time at the nominal 2.4-second base interval: per-item speed and preset harmonics can have non-integer periods there, which creates an export-only discontinuity. Spatial mesh rendering also crops each triangle draw to its source bounds to avoid rerasterizing the full 1920px patch for every triangle.
+Video export uses the same unwrapped elapsed-time timeline as live preview. It must not reset time at the nominal 2.4-second base interval: per-item speed and preset harmonics can have non-integer periods there, which creates an export-only discontinuity. Each triangle draws the complete source under its mesh clip; cropping to triangle bounds caused interpolation gaps along adjacent mesh edges.
