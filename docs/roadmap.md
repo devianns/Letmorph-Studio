@@ -12,6 +12,8 @@ The product journey and implementation gates are defined in [user-flow.md](user-
 - [x] Record architecture, risks, and official research references.
 - [x] Establish Vite + React + TypeScript + Electron scaffold and secure preload boundary.
 - [x] Add a persistent light/dark appearance toggle in the top-right app toolbar.
+- [x] Keep pen input active when guides are hidden and preserve pen mode when switching populated layers.
+- [x] Apply uniform user-facing names and layer controls, and reduce spatial-morph tile seams in rendered output.
 - [x] Add shell UI with Import, Parts, Rig, Animate, and Export workspace navigation.
 
 ## Milestone 1: Import and editable project

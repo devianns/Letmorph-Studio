@@ -186,7 +186,7 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
   return <div ref={viewportRef} className={`preview-viewport ${tool === 'pen' ? 'pen-active' : ''}`} onWheel={handleWheel} onContextMenu={event => event.preventDefault()} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={finishPan} onPointerCancel={finishPan}>
     {fitScale > 0 && <div className="preview-board" style={{ width: boardWidth, height: boardHeight, transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})` }}>
       <canvas ref={canvasRef} className="animated-preview" aria-label="움직이는 캐릭터 미리보기" />
-      {showGuides && <svg className={`selection-overlay tool-${tool} ${boundaryEdit ? 'boundary-edit' : ''}`} viewBox="0 0 100 100" preserveAspectRatio="none" tabIndex={tool === 'pen' ? 0 : -1}
+      {(showGuides || tool === 'pen') && <svg className={`selection-overlay tool-${tool} ${boundaryEdit ? 'boundary-edit' : ''}`} viewBox="0 0 100 100" preserveAspectRatio="none" tabIndex={tool === 'pen' ? 0 : -1}
         onPointerDown={event => {
           if (tool !== 'pen' || event.button !== 0) return
           const point = pointFromEvent(event)
@@ -199,8 +199,8 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
         }}
         onPointerMove={event => { if (tool === 'pen' && draft.current.length) setCursor(pointFromEvent(event)) }}
         onKeyDown={handleKeyDown}>
-        {items.filter(item => !item.empty).map(item => <path key={item.id} d={getItemOutline(item)} className={`item-outline ${selectedItemId === item.id ? 'active' : ''} ${item.visible ? '' : 'hidden'}`} />)}
-        {boundaryEdit && selectedItemId && items.find(item => item.id === selectedItemId)?.points?.map((point, index) => {
+        {showGuides && items.filter(item => !item.empty).map(item => <path key={item.id} d={getItemOutline(item)} className={`item-outline ${selectedItemId === item.id ? 'active' : ''} ${item.visible ? '' : 'hidden'}`} />)}
+        {showGuides && boundaryEdit && selectedItemId && items.find(item => item.id === selectedItemId)?.points?.map((point, index) => {
           const item = items.find(value => value.id === selectedItemId)!
           const assetWidth = item.imageWidth ?? imageWidth, assetHeight = item.imageHeight ?? imageHeight
           const viewPoint = {

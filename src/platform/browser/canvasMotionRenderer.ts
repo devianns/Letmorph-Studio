@@ -115,6 +115,18 @@ function drawSpatialMesh(context: CanvasRenderingContext2D, patch: CanvasImageSo
   const triangle = (a: ReturnType<typeof point>, b: ReturnType<typeof point>, c: ReturnType<typeof point>) => {
     const det = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y)
     if (Math.abs(det) < 1e-5) return
+    // Canvas antialiasing can leave transparent hairlines between adjacent
+    // triangle clips. Expand only the clip by a tiny amount; the affine warp
+    // still maps each triangle from the same shared grid vertices.
+    const centerX = (a.dx + b.dx + c.dx) / 3
+    const centerY = (a.dy + b.dy + c.dy) / 3
+    const overlap = Math.max(0.5, Math.min(1.5, Math.max(width, height) / divisions * 0.012))
+    const expand = (vertex: ReturnType<typeof point>) => {
+      const x = vertex.dx - centerX, y = vertex.dy - centerY
+      const length = Math.hypot(x, y) || 1
+      return { x: vertex.dx + x / length * overlap, y: vertex.dy + y / length * overlap }
+    }
+    const clipA = expand(a), clipB = expand(b), clipC = expand(c)
     const ax = ((b.dx - a.dx) * (c.y - a.y) - (c.dx - a.dx) * (b.y - a.y)) / det
     const cx = ((b.x - a.x) * (c.dx - a.dx) - (c.x - a.x) * (b.dx - a.dx)) / det
     const ex = a.dx - ax * a.x - cx * a.y
@@ -122,7 +134,7 @@ function drawSpatialMesh(context: CanvasRenderingContext2D, patch: CanvasImageSo
     const dy = ((b.x - a.x) * (c.dy - a.dy) - (c.x - a.x) * (b.dy - a.dy)) / det
     const fy = a.dy - by * a.x - dy * a.y
     context.save()
-    context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.lineTo(c.x, c.y); context.closePath(); context.clip()
+    context.beginPath(); context.moveTo(clipA.x, clipA.y); context.lineTo(clipB.x, clipB.y); context.lineTo(clipC.x, clipC.y); context.closePath(); context.clip()
     context.transform(ax, by, cx, dy, ex, fy)
     // Draw the complete source through each triangle clip. Cropping the source
     // per triangle introduced interpolation gaps along mesh boundaries.

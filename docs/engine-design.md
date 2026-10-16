@@ -166,12 +166,12 @@ Item sizing is a separate 0.5?2.0 multiplier applied after the motion pose, and 
 Video export uses the same unwrapped elapsed-time timeline as live preview. It must not reset time at the nominal 2.4-second base interval: per-item speed and preset harmonics can have non-integer periods there, which creates an export-only discontinuity. Each triangle draws the complete source under its mesh clip; cropping to triangle bounds caused interpolation gaps along adjacent mesh edges.
 
 
-Manually created motion items can have empty: true before any content region is assigned. Empty items remain in project data and portable archives but are skipped by the renderer and mask cache. Closing a pen selection assigns its normalized polygon to the active non-source item and clears the empty state; drawing never creates an item implicitly.
+Manually created motion items can have empty: true before any content region is assigned. Empty items remain in project data and portable archives but are skipped by the renderer and mask cache. Closing a pen selection assigns its normalized polygon to the active layer and clears the empty state; drawing never creates a layer implicitly. The pen overlay stays mounted while pen mode is active even when guide visibility is off, so the guide shortcut cannot disable drawing input. Selecting another populated layer preserves the current pen mode.
 
 
 Projects may contain multiple embedded image layers. Each image layer stores a validated data URL and intrinsic dimensions on its MotionItem; the portable project JSON includes these fields, while the renderer decodes each asset once and caches it with a bounded cache. Layer order is item array order. Canvas dimensions are project state and determine preview/export render surfaces; layer images are drawn at intrinsic pixel size (scaled only for output resolution) around the canvas center plus per-item position offsets. Canvas resizing therefore reveals or crops content without destructively changing the source image.
 
-기본 이미지 아이템도 전체 모핑 및 펜 영역 모핑을 지원합니다. 기본 이미지에 펜 영역이 저장되면 원본을 정지 상태로 밑에 유지하고, 마스크된 선택 픽셀만 움직이는 복사본으로 렌더링해 영역이 이동해도 배경이 비치지 않게 합니다. 전체 영역 적용 시에는 선택 마스크를 해제해 기본 이미지 전체에 아이템 모션/공간 모핑을 적용합니다. 미리보기와 영상 내보내기는 이 렌더 경로를 공유합니다.
+모든 이미지 레이어는 전체 모핑 및 펜 영역 모핑을 지원합니다. 작업 원본 레이어에 펜 영역이 저장되면 원본을 정지 상태로 밑에 유지하고, 마스크된 선택 픽셀만 움직이는 복사본으로 렌더링해 영역이 이동해도 배경이 비치지 않게 합니다. 전체 영역 적용 시에는 선택 마스크를 해제해 해당 레이어 전체에 아이템 모션/공간 모핑을 적용합니다. 미리보기와 영상 내보내기는 이 렌더 경로를 공유합니다. 공간 모핑 타일의 클립을 인접 타일과 아주 조금 겹쳐 안티앨리어싱으로 생기는 격자 형태의 투명 틈을 줄이며, 디버그 격자선은 출력에 합성하지 않습니다.
 
 미리보기의 선택 SVG는 작업 여백을 제외한 캔버스 콘텐츠 사각형과 겹칩니다. 포인터, 경계 가이드, 펜 경로는 이 사각형의 0..1 좌표를 그대로 공유해야 하며, 작업 여백 변환을 한 번 더 적용하면 원본 이미지 가이드가 축소되고 펜 입력 위치도 어긋납니다.
 

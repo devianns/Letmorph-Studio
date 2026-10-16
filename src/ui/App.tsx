@@ -8,6 +8,11 @@ import { createPortableProjectFile, parsePortableProjectFile, type PortableProje
 import { downloadBlob } from '../platform/browser/downloadFile'
 
 type EditorTool = 'select' | 'pen'
+function nextLayerName(items: MotionItem[]): string {
+  let index = 1
+  while (items.some(item => item.name === `레이어 ${index}`)) index += 1
+  return `레이어 ${index}`
+}
 const steps = ['그림 가져오기', '아이템 만들기', '움직임 조절', '영상 저장']
 const motionOptions: { id: ImageMotionPreset; name: string; description: string }[] = [
   { id: 'sway', name: '살랑살랑', description: '천천히 좌우로 흔들려요' },
@@ -137,7 +142,7 @@ export default function App() {
         return
       }
       pendingProjectRestore.current = undefined
-      const baseItem: MotionItem = { id: `${project.id}:source`, name: '기본 이미지', source: true, preset: 'sway', amount: 45, speed: 1, horizontal: 100, vertical: 100, rotation: 100, scale: 100, visible: true }
+      const baseItem: MotionItem = { id: `${project.id}:source`, name: nextLayerName([]), source: true, preset: 'sway', amount: 45, speed: 1, horizontal: 100, vertical: 100, rotation: 100, scale: 100, visible: true }
       setItems([baseItem]); setSelectedItemId(baseItem.id)
     } else {
       setItems([]); setSelectedItemId(undefined)
@@ -146,9 +151,8 @@ export default function App() {
   }, [project?.id, projectRestoreRevision])
 
   const addEmptyItem = () => {
-    const number = items.filter(item => !item.source).length + 1
     const item: MotionItem = {
-      id: crypto.randomUUID(), name: `아이템 ${number}`, source: false, empty: true,
+      id: crypto.randomUUID(), name: nextLayerName(items), source: false, empty: true,
       preset: 'sway', amount: 65, speed: 1, horizontal: 100, vertical: 100, rotation: 100, scale: 100,
       edgeSmoothing: 0, edgeFeather: 0, trailCount: 0, visible: true,
     }
@@ -182,7 +186,7 @@ export default function App() {
         throw new Error('이미지 레이어를 포함한 작업 파일 크기가 너무 큽니다. 90MB 이하가 되도록 이미지 크기를 줄여 주세요.')
       }
       const item: MotionItem = {
-        id: crypto.randomUUID(), name: file.name.replace(/\.[^.]+$/, '') || '이미지 레이어',
+        id: crypto.randomUUID(), name: nextLayerName(latestItems.current),
         imageDataUrl, imageWidth, imageHeight,
         source: false, empty: false, preset: 'sway', amount: 45, speed: 1,
         horizontal: 100, vertical: 100, rotation: 100, scale: 100, sizeMultiplier: 1,
@@ -252,7 +256,7 @@ export default function App() {
   }
   const restoreBaseItem = () => {
     if (!project || items.some(item => item.source)) return
-    const baseItem: MotionItem = { id: `${project.id}:source`, name: '기본 이미지', source: true, preset: 'sway', amount: 45, speed: 1, horizontal: 100, vertical: 100, rotation: 100, scale: 100, visible: true }
+    const baseItem: MotionItem = { id: `${project.id}:source`, name: nextLayerName(items), source: true, preset: 'sway', amount: 45, speed: 1, horizontal: 100, vertical: 100, rotation: 100, scale: 100, visible: true }
     commitItems([baseItem, ...items])
     setSelectedItemId(baseItem.id)
   }
@@ -316,7 +320,7 @@ export default function App() {
         <div className="panel-heading"><div><span className="eyebrow">나만의 움직이는 캐릭터</span><h1>{imageUrl ? '움직일 아이템을 만드세요' : '그림을 가져와 주세요'}</h1></div></div>
         <p className="panel-copy">{imageUrl ? '원본 그림 위에 움직일 아이템을 얹어요. 원본은 잘리거나 바뀌지 않습니다.' : '그림 한 장으로 나만의 움직이는 캐릭터를 만들어요.'}</p>
         <div className="section-label">캐릭터 그림</div>
-        {project ? <div className="file-card"><div className="file-icon">▧</div><div className="file-meta"><strong title={project.sourceImage.fileName}>{project.sourceImage.fileName}</strong><span>{project.sourceImage.width} × {project.sourceImage.height}</span></div><button className="more-button" onClick={() => inputRef.current?.click()}>변경</button></div> : <button className="drop-card" onClick={() => inputRef.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void importImage(event.dataTransfer.files[0]) }}><span className="upload-icon">{isLoading ? '…' : '↑'}</span><strong>{isLoading ? '그림을 확인하고 있어요' : '이미지를 여기에 놓으세요'}</strong><span>{isLoading ? '잠시만 기다려 주세요' : '또는 클릭하여 파일 선택'}</span><small>PNG · JPG · WEBP</small></button>}
+        {project ? <div className="file-card"><div className="file-icon">▧</div><div className="file-meta"><strong>작업 이미지</strong><span>{project.sourceImage.width} × {project.sourceImage.height}</span></div><button className="more-button" onClick={() => inputRef.current?.click()}>변경</button></div> : <button className="drop-card" onClick={() => inputRef.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void importImage(event.dataTransfer.files[0]) }}><span className="upload-icon">{isLoading ? '…' : '↑'}</span><strong>{isLoading ? '그림을 확인하고 있어요' : '이미지를 여기에 놓으세요'}</strong><span>{isLoading ? '잠시만 기다려 주세요' : '또는 클릭하여 파일 선택'}</span><small>PNG · JPG · WEBP</small></button>}
         <input ref={inputRef} className="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => { void importImage(event.target.files?.[0]); event.currentTarget.value = '' }} />
         <input ref={imageLayerInputRef} className="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => { void addImageLayer(event.target.files?.[0]); event.currentTarget.value = '' }} />
         <div className="project-file-actions"><button className="selection-button" onClick={() => window.desktop ? void window.desktop.openProject().then(result => {
@@ -333,13 +337,13 @@ export default function App() {
             <button className="tool-button" disabled={!selectedItem} onClick={applyWholeSelection}><b>▣</b><span>전체 영역 적용</span></button>
             <button className="tool-button add-layer-button" onClick={addEmptyItem}><b>＋</b><span>아이템 추가</span></button>
           </div>
-          {!items.some(item => item.source) && <button className="selection-button restore-base" onClick={restoreBaseItem}>기본 이미지 레이어 복구</button>}
-          {tool === 'pen' && <p className="selection-hint">{selectedItem?.source ? '기본 이미지는 그대로 유지되고, 그린 영역이 움직이는 복사 레이어로 추가됩니다. 점을 3개 이상 찍고 Enter를 누르세요.' : `현재 아이템 “${selectedItem?.name ?? '없음'}”에 영역을 그립니다. 점을 3개 이상 찍고 시작점을 다시 누르거나 Enter를 누르면 적용돼요. Backspace는 점 하나 취소, Esc는 그리기 취소예요.`}</p>}
+          {!items.some(item => item.source) && <button className="selection-button restore-base" onClick={restoreBaseItem}>작업 이미지 레이어 복구</button>}
+          {tool === 'pen' && <p className="selection-hint">선택한 “{selectedItem?.name ?? '레이어 없음'}”에 영역을 그립니다. 점을 3개 이상 찍고 시작점을 다시 누르거나 Enter를 누르면 적용돼요. 가이드 숨김 상태에서도 그릴 수 있습니다. Backspace는 점 하나 취소, Esc는 그리기 취소예요.</p>}
           <div className="section-label motion-label">아이템 목록 <span className="item-count">{items.length}</span></div>
           <button className="selection-button add-layer-action" onClick={addEmptyItem}>＋ 빈 아이템 추가</button>
           <button className="selection-button add-layer-action" onClick={() => imageLayerInputRef.current?.click()}>＋ 이미지 레이어 가져오기</button>
           <div className="item-list">{items.length ? items.map((item, index) => <div className={`item-row ${selectedItemId === item.id ? 'selected' : ''}`} key={item.id}>
-            <button className="item-select" onClick={() => { setSelectedItemId(item.id); setEditTargetId(undefined); setTool(item.empty ? 'pen' : 'select') }}><span className="item-order">{String(index + 1).padStart(2, '0')}</span><span className="item-name">{item.name}</span><small>{item.source ? '기본 이미지 레이어' : item.empty ? '빈 레이어 · 그릴 영역 없음' : item.imageDataUrl ? '가져온 이미지 레이어' : item.points ? '펜 선택 영역' : '전체 선택 복사본'}</small></button>
+            <button className="item-select" onClick={() => { setSelectedItemId(item.id); setEditTargetId(undefined); if (item.empty) setTool('pen') }}><span className="item-order">{String(index + 1).padStart(2, '0')}</span><span className="item-name">{item.name}</span><small>{item.empty ? '빈 레이어' : item.points?.length ? '선택 영역' : '전체 이미지'}</small></button>
             <button className="item-visibility" title={item.visible ? '숨기기' : '보이기'} onClick={() => commitItems(items.map(value => value.id === item.id ? { ...value, visible: !value.visible } : value))}>{item.visible ? '◉' : '○'}</button>
             <button className="item-order-action" title="아래 레이어로" aria-label={`${item.name} 아래로`} disabled={index === 0} onClick={() => moveItem(item.id, -1)}>↓</button>
             <button className="item-order-action" title="위 레이어로" aria-label={`${item.name} 위로`} disabled={index === items.length - 1} onClick={() => moveItem(item.id, 1)}>↑</button>
@@ -356,7 +360,7 @@ export default function App() {
           {imageUrl && project ? <CanvasPreview sourceUrl={imageUrl} imageWidth={project.sourceImage.width} imageHeight={project.sourceImage.height} canvasWidth={project.canvas.width} canvasHeight={project.canvas.height} settings={settings} playing={playing} onError={onPreviewError} items={items} selectedItemId={selectedItemId} tool={tool} showGuides={showGuides} boundaryEdit={boundaryEdit && tool === 'select'} onBeginBoundaryEdit={rememberItems} onBeginItemMove={rememberItems} onUpdateItemPosition={(id, positionX, positionY) => setItems(current => current.map(item => item.id === id ? { ...item, positionX, positionY } : item))} onUpdatePoints={(id, points) => setItems(current => current.map(item => item.id === id ? { ...item, points } : item))} onClosePath={applyDrawnRegion} /> : <div className="empty-state"><div className="empty-illustration"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="empty-spark">✦</div><div className="empty-frame"><span>✧</span></div><div className="float-dot dot-one"/><div className="float-dot dot-two"/></div><h2>캐릭터에 첫 움직임을 넣어보세요</h2><p>그림을 추가하면 바로 미리 볼 수 있어요.</p><button className="outline-button" onClick={() => inputRef.current?.click()}>그림 가져오기 <span>↗</span></button></div>}
           {showGuides && <div className="canvas-coordinate">CANVAS <span>{project ? `${project.canvas.width} × ${project.canvas.height}` : '— × —'}</span></div>}
         </div>
-        <div className="canvas-footer"><span>{selectedItem ? `${selectedItem.name} · ${motionOptions.find(option => option.id === selectedItem.preset)?.name}` : '움직임 아이템 없음'}</span><span>{selectedItem?.source ? '기본 이미지 레이어에 효과 적용 중' : '추가 아이템은 기본 이미지 위에서 움직입니다'}</span></div>
+        <div className="canvas-footer"><span>{selectedItem ? `${selectedItem.name} · ${motionOptions.find(option => option.id === selectedItem.preset)?.name}` : '움직임 아이템 없음'}</span><span>선택한 레이어를 독립적으로 편집합니다</span></div>
       </section>
       <aside className="right-panel"><div className="right-heading"><span className="eyebrow">아이템 속성</span><h2>{selectedItem?.name ?? '아이템을 선택하세요'}</h2></div>
         {selectedItem ? <div className="item-properties">
@@ -398,7 +402,7 @@ export default function App() {
             <button className="selection-button edit-region" onClick={() => { setBoundaryEdit(false); setEditTargetId(selectedItem.id); setTool('pen') }}>펜으로 영역 다시 그리기</button>
           </>}
         </div> : <div className="inspector-empty"><div className="layers-icon">▤</div><strong>목록에서 아이템을 고르거나 새로 만드세요</strong><p>선택한 아이템마다 이름과 움직임을 따로 관리할 수 있어요.</p></div>}
-        <div className="format-note"><span>ⓘ</span><p>{selectedItem?.source ? '기본 이미지 레이어는 입력한 원본입니다. 효과를 바꾸거나 숨기고 삭제할 수 있으며, 삭제 후에는 기본 이미지 레이어 복구 도구로 다시 추가할 수 있습니다.' : '펜/전체 선택 아이템은 기본 이미지 위에 복사해 올립니다. 원본 픽셀은 지우지 않으므로 움직여도 바닥 그림은 유지됩니다.'}</p></div>
+        <div className="format-note"><span>ⓘ</span><p>각 레이어를 선택해 영역 그리기, 위치·크기 조절, 움직임 설정을 독립적으로 할 수 있습니다. 영역을 다시 그려도 입력 이미지는 보존됩니다.</p></div>
       </aside>
     </section>
     <footer className="statusbar"><span><i className="status-dot" />{isExporting ? '영상 저장 중' : '준비됨'}</span><span>Letmorph Studio <b>0.1.0</b></span><span>Windows 데스크톱</span></footer>
