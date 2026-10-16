@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react'
 import type { ImageMotionSettings } from '../../engine/evaluateImageMotion'
-import { exportCharacterClip } from '../../application/exportCharacterClip'
 import { downloadBlob } from '../../platform/browser/downloadFile'
 import { recordVideo } from '../../platform/browser/recordVideo'
 
@@ -16,12 +15,12 @@ export function useAnimationExport() {
     setProgress(0)
     setIsExporting(true)
     try {
-      const blob = await exportCharacterClip(sourceUrl, settings, {
+      const blob = await recordVideo(sourceUrl, settings, {
         durationMs: 2400 * Math.max(1, Math.floor(repeatCount)),
         fps: 60,
         maxSide: 1920,
         format,
-      }, { record: recordVideo }, setProgress)
+      }, setProgress)
 
       const extension = blob.type.toLowerCase().startsWith(`video/${format}`) ? format : undefined
       if (!extension) throw new Error(`영상이 ${format.toUpperCase()} 형식으로 만들어지지 않았습니다. 다시 시도해 주세요.`)

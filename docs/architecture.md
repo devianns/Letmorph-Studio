@@ -1,120 +1,91 @@
-# Product and engine architecture
+# Product and code architecture
 
 Updated: 2026-10-16
 
-## Product goal
+This file describes the architecture that exists in the repository. Desired work is labeled **Next**; it must not be read as implemented behavior.
 
-Build a Windows desktop editor and motion engine that turns a static character illustration into a controllable, animated 2D character. The application is the structured middle layer between the image and rendered media. It stores editable parts, masks, spatial relationships, motion controls, and clips, then evaluates and renders them consistently.
+## Product boundary
 
-The user-facing promise is deliberately simple: “Bring a picture, make a character move, and save your own animated character.” Keep implementation concepts such as meshes, pivots, tracks, and constraints inside the engine unless a user opens an advanced editing tool. The main path should use sensible defaults and guided, reversible steps; users should not need prior animation experience.
+Letmorph Studio is an independent 2D image motion editor. It does not create or consume Live2D/Cubism models. It preserves a flattened source image, lets the user define image-backed motion layers, evaluates procedural motion, composites frames, and exports video or an editable `.letmorph` project.
 
-### User journey
-
-1. Add an image and see it safely preserved in the project.
-2. Let the app prepare a movable character and suggest useful parts.
-3. Review/fix the result with direct visual tools and plain-language guidance.
-4. Choose a starter movement or adjust the character with approachable controls.
-5. Preview, optionally refine, then save the project or export a GIF/video.
-
-Measure success by how quickly a first-time user can produce a character clip they like, not by how many engine controls are exposed.
-
-This is an independent technology. It does not use Live2D/Cubism and does not need to interoperate with Cubism. Use “2D character motion engine” or “animated 2D puppet” to describe the product and its output.
-
-## What the engine needs to do
-
-### 1. Import and preparation
-
-- Accept common raster formats first (PNG, JPEG, WebP); preserve the source image and record its dimensions/color profile.
-- Make a working copy and show image bounds, zoom, and background controls.
-- Future PSD import should preserve groups, visibility, ordering, and layer pixels where feasible. Official Cubism guidance expects PSD layers organized by parts and flattened per-part artwork; masks and blend-mode handling have constraints.
-- Report import limitations and never silently flatten the user's only copy.
-
-### 2. Part separation
-
-- Use deterministic image selection: existing alpha, click-to-select color-connected background, polygon lasso, and add/remove brush. These select pixels by explicit rules and do not infer semantic parts.
-- Let the user identify and name movable areas such as hair, head, body, and arms. Keep part masks editable with brush/erase, polygon selection, edge cleanup, feathering, and undo/redo.
-- Consider optional edge-follow or superpixel selection helpers later; they must remain explainable pixel/edge rules, not a required AI model.
-- Let users paint hidden pixels behind foreground parts (“overdraw”) to avoid holes when parts move. This repair work is necessary when starting from a flattened illustration.
-- Represent each part with an RGBA image/mask, z-order, visibility, opacity, pivot, semantic label, and provenance.
-
-### 3. Character graph and deformation
-
-- Convert each part to a mesh with user-adjustable vertices and triangulation. Keep mesh topology separate from source pixels.
-- Model the character as a graph: each part has a stable ID, image/mask, z-order, pivot, parent, transform, and optional mesh/deformer.
-- Provide parent/child transforms, pivots, warp/deform handles, clipping masks, and parameter-driven key poses.
-- Start with practical controls: head angle X/Y/Z, body angle, eye open, mouth open, brow, and hair/accessory sway.
-- Interpolate parameter snapshots to produce motion. Physics can be a later, bounded spring/pendulum simulation with stable deterministic preview/export settings.
-- The runtime engine evaluates the graph and motion clips on a timeline, applies constraints/deformers, and composites parts into each frame. Keep this evaluator independent of the UI so preview and export use the same behavior.
-
-### 4. Motion engine, preview, and export
-
-- Support a timeline with keyframes, clips, loop settings, and preview playback. A motion clip should be a reusable sequence of parameter and transform tracks, not a hard-coded UI animation.
-- Use one deterministic frame-evaluation interface for interactive playback and offline export. Given project state, clip, and timestamp, it returns the pose to render.
-- Export the editable native project plus raster animation outputs such as PNG sequence, GIF, and video. Provide transparent-background controls where the target format supports them.
-- Add still PNG and sprite sheet exports as useful adjacent outputs.
-- Keep export options explicit: dimensions, frame rate, duration, loop, background, and quality.
-- Animation media (including GIF) is a first-class product result. The native project remains the editable source and media files are rendered output.
-
-## Proposed application structure
+## Runtime layers
 
 ```text
-React renderer
-  ├─ workflow UI (Import, Parts, Rig, Animate, Export)
-  ├─ editor state and command/undo stack
-  ├─ 2D canvas renderer (WebGL/canvas abstraction)
-  └─ typed preload API
-       └─ Electron main process
-            ├─ native file dialogs and safe project I/O
-            ├─ project I/O and validation
-            ├─ export job orchestration
-            └─ future local segmentation/render worker
+React UI (`src/ui`)
+  ├─ presents editor state and captures user input
+  ├─ hooks own React lifecycle and temporary browser resources
+  └─ CanvasPreview forwards canvas gestures and draws UI guides
+
+Application workflows (`src/application`)
+  ├─ create/validate a project from an image
+  └─ validate and parse a portable project file
+
+Domain (`src/domain`)
+  ├─ CharacterProject: source metadata and canvas size
+  └─ LayerDocument: layer collection, active layer, history, pure commands
+
+Motion and rendering (`src/engine`, `src/platform/browser`)
+  ├─ deterministic image motion and spatial deformation
+  ├─ canvas renderer shared by preview and recording
+  └─ browser image, video, and download adapters
+
+Electron (`electron`)
+  └─ narrow preload IPC for native dialogs and completed-file writes
 ```
 
-Keep browser-facing modules independent of Electron. The preload bridge exposes narrow operations (open image, open/save project, choose export location) and validates IPC payloads. Renderer code must not access Node APIs directly.
+React is allowed to compose screens and hold presentation-only state (tool, playback, guides, theme, form drafts, progress). Layer edits are domain transitions in `src/domain/layerDocument.ts`; the reducer is UI-framework independent. The renderer sends commands and displays the resulting document. Motion evaluation, geometry, masking, frame rendering, and project validation stay outside React components.
 
-### Code ownership in the current implementation
+### Layer document
 
-- `src/ui/`: React components render state and forward user actions. They must not contain image decoding, image validation rules, project construction, motion interpolation, or export algorithms.
-- `src/ui/hooks/`: React lifecycle and screen state only; call application use cases and manage temporary UI resources such as preview URLs.
-- `src/application/`: TypeScript use cases that coordinate domain operations through injected dependencies.
-- `src/core/` and `src/domain/`: framework-independent validation rules and project/motion data structures.
-- `src/platform/`: browser or Electron adapters for APIs such as image decoding, temporary URLs, file access, and export encoders.
-- `src/engine/`: deterministic pose evaluation and later character/motion runtime. Keep it independent of React so preview and file export can share it.
+`LayerDocument` is the editable layer state for the current editor session:
 
-Current first slice: `application/createCharacterProject.ts` validates an image through `core/image/validateImage.ts`, gets dimensions from `platform/browser/inspectImage.ts`, and produces typed project state. React calls it through `ui/hooks/useCharacterProject.ts`. Import creates a selected `MotionItem` for the source image. Further whole-image copies and normalized polygon masks are additional items, each with independent visibility and motion controls. The versioned `.letmorph` project file stores the `CharacterProject` manifest, all motion items and export preferences, plus the original image embedded as a data URL; Electron provides project open/save dialogs and the renderer validates imported content. The preview board fits the available viewport; zoom and pan transform the board while pen points stay normalized to the source image bounds. `platform/browser/canvasMotionRenderer.ts` renders the source item with its own pose, then composites cached masked copies above it using the shared deterministic pose evaluator. Preview and video recording call the same renderer. Per-vertex mask editing is implemented; image repair is not.
+- `items` is the ordered list of equally editable `MotionItem` layers. The `source` flag currently identifies the bottom source-image layer for compositing; it is a rendering role, not a different editing permission.
+- `selectedItemId` identifies the active target for property changes and pen drawing.
+- `history` stores bounded snapshots for Ctrl+Z. Transient slider/drag updates are grouped by UI checkpoints; layer add/remove/reorder and completed region edits create checkpoints in the domain reducer.
+- `empty` describes a manually added layer with no content yet. Pen paths modify the selected item; drawing never creates an item implicitly.
+- Imported image layers embed their image data URL and dimensions on the item.
 
-Derived mask canvases are sized to the active render target rather than the full source bitmap, and cache entries are pruned when their geometry is no longer used. Rendering isolates errors by item so one failing layer does not halt the preview animation loop; video export reports the item that failed instead of saving a partial clip.
+`reduceLayerDocument` is pure and owns load, clear, select, add, update, remove, reorder, source restoration, checkpoint, and undo transitions. `createMotionItem` owns consistent defaults and `nextLayerName` owns layer naming. No canvas or React state is captured by these functions.
 
-### Suggested domain modules
+### Project and persistence boundaries
 
-- `domain/project`: versioned document schema, migrations, validation.
-- `import`: image decode, format checks, optional PSD adapter.
-- `segmentation`: provider interface and manual mask tools.
-- `character`: parts, mesh, transform hierarchy, constraints, parameters.
-- `motion`: timeline, tracks, interpolation, clips, deterministic evaluation.
-- `engine`: connects project state, character graph, motion evaluation, constraints, and renderer through a stable API.
-- `render`: preview and offscreen frame rendering using the same pose evaluator.
-- `export`: project archive, PNG/GIF/WebM/sprite sheet adapters.
-- `electron`: filesystem and OS integration only.
+There are two current data structures with different jobs:
 
-## Native project data model (initial proposal)
+- `CharacterProject` in `src/domain/project.ts` contains the original image metadata and editable canvas dimensions. Its `parts`, `parameters`, and `clips` fields are currently empty scaffolding and are **not** the runtime motion model.
+- `MotionItem[]` in `src/engine/evaluateImageMotion.ts` is the actual current layer and motion model used by preview and export.
 
-Use a versioned JSON manifest plus referenced image assets in a portable project archive. The manifest should store stable IDs, canvas dimensions, part asset/mask references, z-order, parent-child relationships, pivots, rest transforms, mesh vertices/indices, constraints, parameter definitions and ranges, motion tracks/keyframes, clips, and export metadata. Store original source separately from derived/painted assets. Include schema version and migration path from the first persisted version.
+`PortableProjectFile` in `src/application/portableProjectFile.ts` persists both structures, the original image as a data URL, selected layer, and video export preferences. The application module serializes the document to bytes and enforces the file-size limit before parsing imported files; it validates the archive before creating a browser `File`. Electron only reads/writes bytes after native dialogs. The project file is the editable source of truth once saved. Video is a derived artifact.
 
-Do not bake volatile absolute machine paths into project references. Use relative asset paths and validate all archive paths when reading projects.
+**Known model debt:** `CharacterPart`, `MotionParameter`, and `MotionClip` anticipate a future rig/timeline but are not connected to `MotionItem`, the editor, or `.letmorph` behavior. Do not add features to those types while the current runtime still uses `MotionItem`. A later schema migration should either integrate the concepts into one versioned document or remove unused scaffolding; changing the existing format requires a migration and compatibility review.
 
-The first TypeScript schema is in `src/domain/project.ts`. `src/engine/evaluate.ts` provides the initial pure pose-evaluation API for part transform/opacity tracks and bounded parameters. It is an engine foundation, not yet a complete renderer: mesh deformation, hierarchy composition, constraints, project validation, and UI/export integration remain future work. See [engine design](engine-design.md) for the proposed image-to-character process, low-level rendering boundary, license review approach, and implementation order.
+### Preview and video output
 
-The first end-to-end animation slice uses `src/engine/evaluateImageMotion.ts` to evaluate per-item procedural movement and `src/platform/browser/canvasMotionRenderer.ts` to render the source image as the default base item, followed by whole-image or polygon-masked copies above it. `src/platform/browser/recordVideo.ts` records repeated 2.4-second cycles from the same frame renderer. MP4 uses Mediabunny to encode H.264 through WebCodecs and mux a regular fast-start ISO BMFF file; WebM uses Chromium `MediaRecorder`. MP4 is enabled when WebCodecs exists and checks actual H.264 encoder availability before rendering. The app never saves WebM bytes with an MP4 extension. The MP4 currently contains a video track only (no audio). AVI is not implemented. The Electron main process writes the completed bytes after a save dialog. Polygon feathering is clipped to the raw user-drawn mask so the effect remains inside the selected boundary. The first editor supports multiple session-level items, tool selection, closed pen masks, and item-level controls. PixiJS mesh rendering remains a later option when independently moving parts and mesh deformation are implemented.
+`evaluateImageMotion.ts` and `evaluateSpatialMorph.ts` are deterministic TypeScript evaluators. `canvasMotionRenderer.ts` draws the source underlay, image-backed layers, masks, trails, and spatial deformation. `CanvasPreview` and `recordVideo.ts` call the same frame renderer. The renderer owns image/mask caches and rendering failures; UI owns only presentation errors.
 
-## Important constraints and risks
+MP4 uses Mediabunny and WebCodecs H.264 encoding/muxing. WebM uses Chromium `MediaRecorder`. `electron/main.ts` receives encoded bytes and writes them to a path chosen through the save dialog. No GIF, AVI, standalone PNG sequence, mesh rig, hidden-pixel repair, or Live2D model export is implemented.
 
-- A single flattened raster has no recoverable hidden artwork. Automated segmentation can propose masks but cannot reliably reconstruct occluded regions; user cleanup is part of the workflow.
-- Plausible movement needs adequate part separation, mesh topology, overlap repair, deformation, and tuning. An image split alone will look like paper cutouts.
-- Motion must be represented as data and evaluated by the engine, rather than being implemented as one-off effects in screen components. This is what makes characters editable and motions reusable.
-- User images can be sensitive. Default to local storage/processing and avoid telemetry or uploads without informed opt-in.
+## Module ownership rules
 
-## References
+| Area | Owns | Must not own |
+|---|---|---|
+| `src/ui` | React composition, accessibility, UI-only toggles and drafts, dispatching domain commands | layer mutation rules, image validation, geometry math, motion math, file parsing, encoding |
+| `src/ui/hooks` | React lifecycle, async UI status, temporary URLs, export progress | duplicated domain state transitions or rendering algorithms |
+| `src/application` | meaningful user workflows, input validation/coordination, persistence schemas | pass-through wrappers that only rename a call |
+| `src/domain` | portable editor data, pure state transitions, undo semantics | DOM, React, Canvas, Electron, file dialogs |
+| `src/engine` | deterministic geometry, pose evaluation, rendering-independent motion rules | UI and browser globals |
+| `src/platform` | browser APIs and rendering/encoding adapters | editor workflow state |
+| `electron` | OS dialogs and safe file I/O through validated IPC | motion or project-domain decisions |
 
-- [Cubism PSD import](https://docs.live2d.com/en/cubism-editor-manual/psd-import/) and [illustration preparation tutorial](https://docs.live2d.com/4.2/en/cubism-editor-tutorials/psd/): reference examples for how character artwork can be separated into movable parts. The app does not import/export Cubism model files.
+When moving behavior, move its state ownership and rules, not just the function body. Prefer one canonical model and explicit commands over helper layers that forward the same arguments.
 
+## Next architecture work
+
+1. Put image-layer decoding/size checks behind an application workflow and browser image adapter; keep the asynchronous import race guard at the UI lifecycle boundary.
+2. Make a single versioned editor document the persistence boundary, with explicit layer kinds and validation. Migrate `.letmorph` v1 instead of silently changing its shape.
+3. Move source-image blob collection and native/browser save orchestration out of `App.tsx`; keep Electron limited to bytes and dialogs.
+4. Remove or integrate the unused part/parameter/clip scaffolding after a migration path is chosen.
+5. Break `App.tsx` into presentational panels only after state ownership is stable; moving JSX alone does not fix architecture.
+
+## Security and licensing
+
+Renderer code has no direct Node access. Keep context isolation and the narrow preload API. The app currently depends on React and Mediabunny at runtime; review their licenses and all transitive production dependencies before distributing a release. No network service or AI inference is required by the implemented path.

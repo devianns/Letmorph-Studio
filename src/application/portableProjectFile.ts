@@ -61,14 +61,21 @@ function isCharacterProject(value: unknown): value is CharacterProject {
     && Array.isArray(project.parts) && Array.isArray(project.parameters) && Array.isArray(project.clips)
 }
 
-export function createPortableProjectFile(
+export function serializePortableProjectFile(
   project: CharacterProject,
   sourceImageDataUrl: string,
   items: MotionItem[],
   selectedItemId: string | undefined,
   exportSettings: PortableProjectFile['exportSettings'],
-): PortableProjectFile {
-  return { format: 'letmorph-studio-project', formatVersion: 1, project, sourceImageDataUrl, items, selectedItemId, exportSettings }
+): Uint8Array {
+  const archive: PortableProjectFile = { format: 'letmorph-studio-project', formatVersion: 1, project, sourceImageDataUrl, items, selectedItemId, exportSettings }
+  return new TextEncoder().encode(JSON.stringify(archive))
+}
+
+/** Read the portable project at its file boundary so size limits apply before parsing. */
+export async function readPortableProjectFile(file: File): Promise<{ archive: PortableProjectFile; sourceImage: File }> {
+  if (file.size > 100 * 1024 * 1024) throw new Error('작업 파일은 100MB 이하여야 합니다.')
+  return parsePortableProjectFile(await file.text())
 }
 
 export function parsePortableProjectFile(contents: string): { archive: PortableProjectFile; sourceImage: File } {

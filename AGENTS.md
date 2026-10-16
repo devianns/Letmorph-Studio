@@ -20,6 +20,10 @@ This repository is the starting point for a Windows desktop 2D character motion 
 - `docs/user-flow.md` is the product UX source of truth. Tie user-facing features to a step in its Input → Program → Output journey and update the document when that journey changes.
 - Keep image segmentation, layer editing, puppet graph, motion, playback, rendering, and export as separate modules with typed project data between them.
 - The project file is the editable source of truth. Exports are derived artifacts.
+- Treat `docs/architecture.md` as the current module ownership map and `docs/user-flow.md` as the current user-facing behavior source. Mark future proposals as planned; do not describe unused schema types as implemented runtime features.
+- Keep layer identity, ordering, selection, and undo transitions in the pure TypeScript domain model (`src/domain/layerDocument.ts`). React dispatches commands and renders state.
+- Do not add pass-through wrappers. Move ownership and rules to the correct layer; an application module must coordinate a meaningful workflow or enforce a boundary.
+- When replacing an architecture, update consumers and persisted-project migration together. Do not leave two competing runtime models.
 
 ## Working on the project
 
