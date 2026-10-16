@@ -72,8 +72,13 @@ export default function App() {
         undo()
       }
       const target = event.target as HTMLElement | null
-      if (event.key === '1' && !event.ctrlKey && !event.metaKey && !event.altKey
-        && !target?.isContentEditable && !['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '')) {
+      const shortcutAllowed = !event.ctrlKey && !event.metaKey && !event.altKey
+        && !target?.isContentEditable && !['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName ?? '')
+      if (shortcutAllowed && event.key === '1') {
+        event.preventDefault()
+        setPlaying(value => !value)
+      }
+      if (shortcutAllowed && event.key === '2') {
         event.preventDefault()
         setShowGuides(value => !value)
       }
@@ -217,7 +222,7 @@ export default function App() {
         </>}
       </aside>
       <section className="canvas-area" aria-label="움직임 미리보기">
-        <div className="canvas-toolbar"><div className="canvas-label"><span className="live-indicator" /> 미리보기 <span className="canvas-divider">/</span> {project?.name ?? '새 캐릭터'}</div><div className="canvas-tools"><button onClick={() => setPlaying(value => !value)} title={playing ? '멈추기' : '재생하기'}>{playing ? 'Ⅱ' : '▶'}</button><span>{playing ? '재생 중' : '멈춤'}</span><button className={`guide-toggle ${showGuides ? 'active' : ''}`} aria-pressed={showGuides} onClick={() => setShowGuides(value => !value)} title="가이드 토글 (숫자키 1)">{showGuides ? '가이드 숨기기' : '가이드 보기'} <kbd>1</kbd></button><span className="toolbar-divider" /><span>{tool === 'pen' ? '펜 모드' : items.length ? `${items.length}개 아이템` : '정적 원본'}</span></div></div>
+        <div className="canvas-toolbar"><div className="canvas-label"><span className="live-indicator" /> 미리보기 <span className="canvas-divider">/</span> {project?.name ?? '새 캐릭터'}</div><div className="canvas-tools"><button onClick={() => setPlaying(value => !value)} title="재생/멈춤 토글 (숫자키 1)">{playing ? 'Ⅱ' : '▶'} <kbd>1</kbd></button><span>{playing ? '재생 중' : '멈춤'}</span><button className={`guide-toggle ${showGuides ? 'active' : ''}`} aria-pressed={showGuides} onClick={() => setShowGuides(value => !value)} title="가이드 토글 (숫자키 2)">{showGuides ? '가이드 숨기기' : '가이드 보기'} <kbd>2</kbd></button><span className="toolbar-divider" /><span>{tool === 'pen' ? '펜 모드' : items.length ? `${items.length}개 아이템` : '정적 원본'}</span></div></div>
         <div className={`canvas-stage ${imageUrl ? 'has-image' : ''}`}>
           {imageUrl && project ? <CanvasPreview sourceUrl={imageUrl} imageWidth={project.canvas.width} imageHeight={project.canvas.height} settings={settings} playing={playing} onError={onPreviewError} items={items} selectedItemId={selectedItemId} tool={tool} showGuides={showGuides} boundaryEdit={boundaryEdit && tool === 'select'} onBeginBoundaryEdit={rememberItems} onUpdatePoints={(id, points) => setItems(current => current.map(item => item.id === id ? { ...item, points } : item))} onClosePath={points => { const target = items.find(item => item.id === editTargetId); if (target) { commitItems(items.map(item => item.id === target.id ? { ...item, points } : item)); setEditTargetId(undefined); setTool('select') } else addItem(points) }} /> : <div className="empty-state"><div className="empty-illustration"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="empty-spark">✦</div><div className="empty-frame"><span>✧</span></div><div className="float-dot dot-one"/><div className="float-dot dot-two"/></div><h2>캐릭터에 첫 움직임을 넣어보세요</h2><p>그림을 추가하면 바로 미리 볼 수 있어요.</p><button className="outline-button" onClick={() => inputRef.current?.click()}>그림 가져오기 <span>↗</span></button></div>}
           {showGuides && <div className="canvas-coordinate">CANVAS <span>{project ? `${project.canvas.width} × ${project.canvas.height}` : '— × —'}</span></div>}
