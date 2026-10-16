@@ -17,7 +17,7 @@ export function useAnimationExport() {
     setIsExporting(true)
     try {
       const blob = await exportCharacterClip(sourceUrl, settings, {
-        durationMs: 2400 * Math.max(1, Math.min(25, Math.floor(repeatCount))),
+        durationMs: 2400 * Math.max(1, Math.floor(repeatCount)),
         fps: 60,
         maxSide: 1920,
         format,

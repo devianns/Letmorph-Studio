@@ -3,7 +3,7 @@ import { CanvasPreview } from './CanvasPreview'
 import { useAnimationExport } from './hooks/useAnimationExport'
 import { useCharacterProject } from './hooks/useCharacterProject'
 import type { ImageMotionPreset, ImageMotionSettings, MotionItem } from '../engine/evaluateImageMotion'
-import { isVideoFormatSupported } from '../platform/browser/recordVideo'
+import { estimateVideoBytes, isVideoFormatSupported, MAX_VIDEO_EXPORT_BYTES } from '../platform/browser/recordVideo'
 import { createPortableProjectFile, parsePortableProjectFile, type PortableProjectFile } from '../application/portableProjectFile'
 import { downloadBlob } from '../platform/browser/downloadFile'
 
@@ -28,6 +28,20 @@ function blobAsDataUrl(blob: Blob): Promise<string> {
     reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('원본 이미지 변환에 실패했습니다.'))
     reader.readAsDataURL(blob)
   })
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes > MAX_VIDEO_EXPORT_BYTES) return '512 MB 초과'
+  if (bytes >= 1024 ** 3) return `${(bytes / 1024 ** 3).toFixed(1)} GB`
+  if (bytes >= 1024 ** 2) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`
+}
+
+function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds)) return '장시간'
+  if (seconds >= 3600) return `${(seconds / 3600).toFixed(1)}시간`
+  if (seconds >= 60) return `${(seconds / 60).toFixed(1)}분`
+  return `${seconds.toFixed(1)}초`
 }
 
 export default function App() {
@@ -89,10 +103,15 @@ export default function App() {
         event.preventDefault()
         setShowGuides(value => !value)
       }
+      if (shortcutAllowed && event.key === '3' && selectedItem?.points?.length) {
+        event.preventDefault()
+        setTool('select')
+        setBoundaryEdit(value => !value)
+      }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [undo])
+  }, [selectedItem?.id, Boolean(selectedItem?.points?.length), undo])
   useEffect(() => {
     if (project) {
       setCanvasDraft({ width: project.canvas.width, height: project.canvas.height })
@@ -271,6 +290,7 @@ export default function App() {
     preset: selectedItem?.preset ?? 'sway', amount: selectedItem?.amount ?? 65, speed: selectedItem?.speed ?? 1,
     background: '#f2efe8', canvasWidth: project?.canvas.width, canvasHeight: project?.canvas.height, items,
   }), [items, project?.canvas.height, project?.canvas.width, selectedItem])
+  const estimatedExportBytes = estimateVideoBytes(settings, 2400 * repeatCount)
   const onPreviewError = useCallback((message: string) => setPreviewError(message), [])
   const handleExport = () => { if (imageUrl) void exportAnimation(imageUrl, settings, videoFormat, repeatCount) }
   const currentError = importError ?? exportError ?? projectFileError ?? previewError
@@ -279,7 +299,7 @@ export default function App() {
     <header className="topbar">
       <div className="brand"><span className="brand-mark">L</span><span>Letmorph <span className="brand-light">Studio</span></span></div>
       <div className="project-title">{project?.name ?? '새 캐릭터'} <span className="unsaved-dot" /></div>
-      <div className="top-actions"><button className="quiet-button" disabled={!imageUrl} onClick={resetProject}>처음으로</button><details className="canvas-size-menu"><summary>캔버스 {project ? `${project.canvas.width}×${project.canvas.height}` : '크기'}</summary><div className="canvas-size-fields"><label>너비<input type="number" min="64" max="32768" value={canvasDraft.width || ''} disabled={!project} onChange={event => setCanvasDraft(value => ({ ...value, width: Number(event.target.value) }))} /></label><label>높이<input type="number" min="64" max="32768" value={canvasDraft.height || ''} disabled={!project} onChange={event => setCanvasDraft(value => ({ ...value, height: Number(event.target.value) }))} /></label><button disabled={!project} onClick={applyCanvasSize}>적용</button></div></details><label className="export-format-control"><span>형식</span><select aria-label="내보내기 형식" value={videoFormat} onChange={event => setVideoFormat(event.target.value as 'mp4' | 'webm')}><option value="mp4" disabled={!isVideoFormatSupported('mp4')}>MP4{isVideoFormatSupported('mp4') ? '' : ' (지원 안 됨)'}</option><option value="webm" disabled={!isVideoFormatSupported('webm')}>WebM{isVideoFormatSupported('webm') ? '' : ' (지원 안 됨)'}</option></select></label><label className="export-format-control repeat-count-control"><span>반복</span><input aria-label="영상 반복 횟수 (최대 25회)" type="number" min="1" max="25" step="1" value={repeatCount} onChange={event => setRepeatCount(Math.max(1, Math.min(25, Number(event.target.value) || 1)))} /><small>{(repeatCount * 2.4).toFixed(1)}초</small></label><span className="save-state">{saved ? '영상이 저장됐어요' : '작업 중'}</span><button className="quiet-button" disabled={!imageUrl || isExporting || !isVideoFormatSupported(videoFormat)} onClick={handleExport}>영상 저장</button></div>
+      <div className="top-actions"><button className="quiet-button" disabled={!imageUrl} onClick={resetProject}>처음으로</button><details className="canvas-size-menu"><summary>캔버스 {project ? `${project.canvas.width}×${project.canvas.height}` : '크기'}</summary><div className="canvas-size-fields"><label>너비<input type="number" min="64" max="32768" value={canvasDraft.width || ''} disabled={!project} onChange={event => setCanvasDraft(value => ({ ...value, width: Number(event.target.value) }))} /></label><label>높이<input type="number" min="64" max="32768" value={canvasDraft.height || ''} disabled={!project} onChange={event => setCanvasDraft(value => ({ ...value, height: Number(event.target.value) }))} /></label><button disabled={!project} onClick={applyCanvasSize}>적용</button></div></details><label className="export-format-control"><span>형식</span><select aria-label="내보내기 형식" value={videoFormat} onChange={event => setVideoFormat(event.target.value as 'mp4' | 'webm')}><option value="mp4" disabled={!isVideoFormatSupported('mp4')}>MP4{isVideoFormatSupported('mp4') ? '' : ' (지원 안 됨)'}</option><option value="webm" disabled={!isVideoFormatSupported('webm')}>WebM{isVideoFormatSupported('webm') ? '' : ' (지원 안 됨)'}</option></select></label><label className="export-format-control repeat-count-control"><span>반복</span><input aria-label="영상 반복 횟수" type="number" min="1" step="1" value={repeatCount} onChange={event => { const count = Number(event.target.value); if (Number.isSafeInteger(count) && count > 0) setRepeatCount(count) }} /><small>{formatDuration(repeatCount * 2.4)} · 약 {formatBytes(estimatedExportBytes)}</small></label><span className="save-state">{saved ? '영상이 저장됐어요' : '작업 중'}</span><button className="quiet-button" disabled={!imageUrl || isExporting || !isVideoFormatSupported(videoFormat) || estimatedExportBytes > MAX_VIDEO_EXPORT_BYTES} title={estimatedExportBytes > MAX_VIDEO_EXPORT_BYTES ? '예상 영상이 512 MB를 넘습니다. 반복 횟수를 줄이거나 캔버스 크기를 낮춰 주세요.' : undefined} onClick={handleExport}>영상 저장</button></div>
     </header>
     <nav className="workflow" aria-label="만들기 단계">{steps.map((step, index) => <div className={`workflow-step ${index === (imageUrl ? 1 : 0) ? 'active' : ''}`} key={step}><span className="step-number">0{index + 1}</span>{step}{index < steps.length - 1 && <span className="step-arrow">›</span>}</div>)}</nav>
     <section className="workspace">
@@ -322,9 +342,9 @@ export default function App() {
         </>}
       </aside>
       <section className="canvas-area" aria-label="움직임 미리보기">
-        <div className="canvas-toolbar"><div className="canvas-label"><span className="live-indicator" /> 미리보기 <span className="canvas-divider">/</span> {project?.name ?? '새 캐릭터'}</div><div className="canvas-tools"><button className={`play-toggle ${playing ? 'active' : ''}`} aria-pressed={playing} onClick={() => setPlaying(value => !value)} title="재생/멈춤 토글 (숫자키 1)"><span className="play-toggle-icon">{playing ? 'Ⅱ' : '▶'}</span>{playing ? '멈춤' : '재생'} <kbd>1</kbd></button><span>{playing ? '재생 중' : '멈춤'}</span><button className={`guide-toggle ${showGuides ? 'active' : ''}`} aria-pressed={showGuides} onClick={() => setShowGuides(value => !value)} title="가이드 토글 (숫자키 2)">{showGuides ? '가이드 숨기기' : '가이드 보기'} <kbd>2</kbd></button><span className="toolbar-divider" /><span>{tool === 'pen' ? '펜 모드' : items.length ? `${items.length}개 아이템` : '정적 원본'}</span></div></div>
+        <div className="canvas-toolbar"><div className="canvas-label"><span className="live-indicator" /> 미리보기 <span className="canvas-divider">/</span> {project?.name ?? '새 캐릭터'}</div><div className="canvas-tools"><button className={`play-toggle ${playing ? 'active' : ''}`} aria-pressed={playing} onClick={() => setPlaying(value => !value)} title="재생/멈춤 토글 (숫자키 1)"><span className="play-toggle-icon">{playing ? 'Ⅱ' : '▶'}</span>{playing ? '멈춤' : '재생'} <kbd>1</kbd></button><button className={`guide-toggle ${showGuides ? 'active' : ''}`} aria-pressed={showGuides} onClick={() => setShowGuides(value => !value)} title="가이드 토글 (숫자키 2)">{showGuides ? '가이드 숨기기' : '가이드 보기'} <kbd>2</kbd></button><button className={`boundary-toggle ${boundaryEdit ? 'active' : ''}`} disabled={!selectedItem?.points?.length} aria-pressed={boundaryEdit} onClick={() => { setTool('select'); setBoundaryEdit(value => !value) }} title={selectedItem?.points?.length ? '선택 영역 경계 조절 (숫자키 3)' : '경계점이 있는 아이템을 선택하면 사용할 수 있어요'}>{boundaryEdit ? '경계 조절 완료' : '경계 조절'} <kbd>3</kbd></button><span className="toolbar-divider" /><span>{playing ? '재생 중' : '멈춤'} · {tool === 'pen' ? '펜 모드' : items.length ? `${items.length}개 아이템` : '정적 원본'}</span></div></div>
         <div className={`canvas-stage ${imageUrl ? 'has-image' : ''}`}>
-          {imageUrl && project ? <CanvasPreview sourceUrl={imageUrl} imageWidth={project.sourceImage.width} imageHeight={project.sourceImage.height} canvasWidth={project.canvas.width} canvasHeight={project.canvas.height} settings={settings} playing={playing} onError={onPreviewError} items={items} selectedItemId={selectedItemId} tool={tool} showGuides={showGuides} boundaryEdit={boundaryEdit && tool === 'select'} onBeginBoundaryEdit={rememberItems} onUpdatePoints={(id, points) => setItems(current => current.map(item => item.id === id ? { ...item, points } : item))} onClosePath={applyDrawnRegion} /> : <div className="empty-state"><div className="empty-illustration"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="empty-spark">✦</div><div className="empty-frame"><span>✧</span></div><div className="float-dot dot-one"/><div className="float-dot dot-two"/></div><h2>캐릭터에 첫 움직임을 넣어보세요</h2><p>그림을 추가하면 바로 미리 볼 수 있어요.</p><button className="outline-button" onClick={() => inputRef.current?.click()}>그림 가져오기 <span>↗</span></button></div>}
+          {imageUrl && project ? <CanvasPreview sourceUrl={imageUrl} imageWidth={project.sourceImage.width} imageHeight={project.sourceImage.height} canvasWidth={project.canvas.width} canvasHeight={project.canvas.height} settings={settings} playing={playing} onError={onPreviewError} items={items} selectedItemId={selectedItemId} tool={tool} showGuides={showGuides} boundaryEdit={boundaryEdit && tool === 'select'} onBeginBoundaryEdit={rememberItems} onBeginItemMove={rememberItems} onUpdateItemPosition={(id, positionX, positionY) => setItems(current => current.map(item => item.id === id ? { ...item, positionX, positionY } : item))} onUpdatePoints={(id, points) => setItems(current => current.map(item => item.id === id ? { ...item, points } : item))} onClosePath={applyDrawnRegion} /> : <div className="empty-state"><div className="empty-illustration"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="empty-spark">✦</div><div className="empty-frame"><span>✧</span></div><div className="float-dot dot-one"/><div className="float-dot dot-two"/></div><h2>캐릭터에 첫 움직임을 넣어보세요</h2><p>그림을 추가하면 바로 미리 볼 수 있어요.</p><button className="outline-button" onClick={() => inputRef.current?.click()}>그림 가져오기 <span>↗</span></button></div>}
           {showGuides && <div className="canvas-coordinate">CANVAS <span>{project ? `${project.canvas.width} × ${project.canvas.height}` : '— × —'}</span></div>}
         </div>
         <div className="canvas-footer"><span>{selectedItem ? `${selectedItem.name} · ${motionOptions.find(option => option.id === selectedItem.preset)?.name}` : '움직임 아이템 없음'}</span><span>{selectedItem?.source ? '기본 이미지 레이어에 효과 적용 중' : '추가 아이템은 기본 이미지 위에서 움직입니다'}</span></div>
@@ -335,9 +355,9 @@ export default function App() {
           {selectedItem.empty && <p className="selection-hint">아직 그려진 영역이 없는 빈 아이템입니다. 펜으로 영역을 닫으면 이 아이템에 저장됩니다.</p>}
           <div className="section-label motion-label">움직임</div><div className="motion-options" role="radiogroup" aria-label="움직임 선택">{motionOptions.map(option => <button key={option.id} className={`motion-option ${selectedItem.preset === option.id ? 'selected' : ''}`} role="radio" aria-checked={selectedItem.preset === option.id} onClick={() => updateSelected({ preset: option.id })}><span className={`motion-symbol ${option.id}`}>{option.id === 'sway' ? '↝' : option.id === 'bounce' ? '↟' : '↶'}</span><span><strong>{option.name}</strong><small>{option.description}</small></span></button>)}</div>
           <label className="range-control"><span>움직임 크기 <b>{selectedItem.amount}%</b></span><input type="range" min="0" max="100" value={selectedItem.amount} onPointerDown={rememberItems} onKeyDown={event => { if (event.key.startsWith('Arrow')) rememberItems() }} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, amount: Number(event.target.value) } : item))} /></label>
-          <label className="range-control"><span>아이템 크기 <b>{(selectedItem.sizeMultiplier ?? 1).toFixed(2)}×</b></span><input aria-label="선택 아이템 크기" type="range" min="0.5" max="2" step="0.05" value={selectedItem.sizeMultiplier ?? 1} onPointerDown={rememberItems} onKeyDown={event => { if (event.key.startsWith('Arrow')) rememberItems() }} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, sizeMultiplier: Number(event.target.value) } : item))} /></label>
-          <label className="range-control"><span>가로 위치 <b>{selectedItem.positionX ?? 0}%</b></span><input type="range" min="-100" max="100" value={selectedItem.positionX ?? 0} onPointerDown={rememberItems} onKeyDown={event => { if (event.key.startsWith('Arrow')) rememberItems() }} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, positionX: Number(event.target.value) } : item))} /></label>
-          <label className="range-control"><span>세로 위치 <b>{selectedItem.positionY ?? 0}%</b></span><input type="range" min="-100" max="100" value={selectedItem.positionY ?? 0} onPointerDown={rememberItems} onKeyDown={event => { if (event.key.startsWith('Arrow')) rememberItems() }} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, positionY: Number(event.target.value) } : item))} /></label>
+          <label className="range-control"><span>아이템 크기 <input className="size-value" aria-label="아이템 크기 배율" type="number" min="0.1" max="5" step="0.01" value={(selectedItem.sizeMultiplier ?? 1).toFixed(2)} onFocus={rememberItems} onChange={event => { const sizeMultiplier = Number(event.target.value); if (Number.isFinite(sizeMultiplier)) setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, sizeMultiplier: Math.max(0.1, Math.min(5, sizeMultiplier)) } : item)) }} /><b>×</b></span><input aria-label="선택 아이템 크기" type="range" min="0.1" max="5" step="0.01" value={selectedItem.sizeMultiplier ?? 1} onPointerDown={rememberItems} onKeyDown={event => { if (event.key.startsWith('Arrow')) rememberItems() }} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, sizeMultiplier: Number(event.target.value) } : item))} /></label>
+          <label className="range-control"><span>가로 위치 <b>{selectedItem.positionX ?? 0}%</b></span><input type="range" min="-300" max="300" value={selectedItem.positionX ?? 0} onPointerDown={rememberItems} onKeyDown={event => { if (event.key.startsWith('Arrow')) rememberItems() }} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, positionX: Number(event.target.value) } : item))} /></label>
+          <label className="range-control"><span>세로 위치 <b>{selectedItem.positionY ?? 0}%</b></span><input type="range" min="-300" max="300" value={selectedItem.positionY ?? 0} onPointerDown={rememberItems} onKeyDown={event => { if (event.key.startsWith('Arrow')) rememberItems() }} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, positionY: Number(event.target.value) } : item))} /></label>
           <label className="range-control"><span>움직임 속도 <b>{selectedItem.speed.toFixed(1)}배</b></span><input type="range" min="0.5" max="1.8" step="0.1" value={selectedItem.speed} onPointerDown={rememberItems} onKeyDown={event => { if (event.key.startsWith('Arrow')) rememberItems() }} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, speed: Number(event.target.value) } : item))} /></label>
           <div className="section-label tuning-heading">세부 조절 <small>프리셋 움직임의 축별 크기</small></div>
           {([
@@ -365,7 +385,6 @@ export default function App() {
             <p className="selection-hint">모서리 다듬기는 꼭짓점을 깎아 선을 부드럽게 하고, 경계 부드럽게는 이미지 크기에 비례해 가장자리를 흐립니다.</p>
           </>}
           {selectedItem.points && <>
-            <button className={`selection-button edit-region ${boundaryEdit ? 'selected' : ''}`} aria-pressed={boundaryEdit} onClick={() => { setTool('select'); setBoundaryEdit(value => !value) }}>{boundaryEdit ? '경계 조절 완료' : '경계점 조절'}</button>
             <button className="selection-button edit-region" onClick={() => { setBoundaryEdit(false); setEditTargetId(selectedItem.id); setTool('pen') }}>펜으로 영역 다시 그리기</button>
           </>}
         </div> : <div className="inspector-empty"><div className="layers-icon">▤</div><strong>목록에서 아이템을 고르거나 새로 만드세요</strong><p>선택한 아이템마다 이름과 움직임을 따로 관리할 수 있어요.</p></div>}

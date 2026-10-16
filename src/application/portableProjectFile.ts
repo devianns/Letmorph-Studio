@@ -33,10 +33,10 @@ function isMotionItem(value: unknown): value is MotionItem {
     if (item[key] !== undefined && (!isFiniteNumber(item[key]) || item[key] < 1 || item[key] > 8192)) return false
   }
   for (const key of ['positionX', 'positionY'] as const) {
-    if (item[key] !== undefined && (!isFiniteNumber(item[key]) || item[key] < -100 || item[key] > 100)) return false
+    if (item[key] !== undefined && (!isFiniteNumber(item[key]) || item[key] < -300 || item[key] > 300)) return false
   }
   if (item.morphMode !== undefined && !allowedMorphModes.includes(String(item.morphMode))) return false
-  for (const [key, min, max] of [['morphAmount', 0, 100], ['morphAngle', 0, 360], ['morphFrequency', 1, 8], ['morphWidthBias', -100, 100], ['sizeMultiplier', 0.5, 2]] as const) {
+  for (const [key, min, max] of [['morphAmount', 0, 100], ['morphAngle', 0, 360], ['morphFrequency', 1, 8], ['morphWidthBias', -100, 100], ['sizeMultiplier', 0.1, 5]] as const) {
     if (item[key] !== undefined && (!isFiniteNumber(item[key]) || item[key] < min || item[key] > max)) return false
   }
   if (item.points !== undefined && (!Array.isArray(item.points) || item.points.length < 3 || item.points.length > 10000
@@ -86,7 +86,7 @@ export function parsePortableProjectFile(contents: string): { archive: PortableP
   }
   const exportSettings = archive.exportSettings as Record<string, unknown> | undefined
   if (!exportSettings || !['mp4', 'webm'].includes(String(exportSettings.format))
-    || !isFiniteNumber(exportSettings.repeatCount) || exportSettings.repeatCount < 1 || exportSettings.repeatCount > 25) {
+    || typeof exportSettings.repeatCount !== 'number' || !Number.isSafeInteger(exportSettings.repeatCount) || exportSettings.repeatCount < 1) {
     throw new Error('작업 파일의 영상 저장 설정이 올바르지 않습니다.')
   }
   if (typeof archive.sourceImageDataUrl !== 'string') throw new Error('작업 파일에 원본 이미지가 없습니다.')

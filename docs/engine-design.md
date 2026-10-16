@@ -172,3 +172,9 @@ Manually created motion items can have empty: true before any content region is 
 Projects may contain multiple embedded image layers. Each image layer stores a validated data URL and intrinsic dimensions on its MotionItem; the portable project JSON includes these fields, while the renderer decodes each asset once and caches it with a bounded cache. Layer order is item array order. Canvas dimensions are project state and determine preview/export render surfaces; layer images are drawn at intrinsic pixel size (scaled only for output resolution) around the canvas center plus per-item position offsets. Canvas resizing therefore reveals or crops content without destructively changing the source image.
 
 기본 이미지 아이템도 전체 모핑 및 펜 영역 모핑을 지원합니다. 기본 이미지에 펜 영역이 저장되면 원본을 정지 상태로 밑에 유지하고, 마스크된 선택 픽셀만 움직이는 복사본으로 렌더링해 영역이 이동해도 배경이 비치지 않게 합니다. 전체 영역 적용 시에는 선택 마스크를 해제해 기본 이미지 전체에 아이템 모션/공간 모핑을 적용합니다. 미리보기와 영상 내보내기는 이 렌더 경로를 공유합니다.
+
+미리보기의 선택 SVG는 작업 여백을 제외한 캔버스 콘텐츠 사각형과 겹칩니다. 포인터, 경계 가이드, 펜 경로는 이 사각형의 0..1 좌표를 그대로 공유해야 하며, 작업 여백 변환을 한 번 더 적용하면 원본 이미지 가이드가 축소되고 펜 입력 위치도 어긋납니다.
+
+부분 마스크 아이템은 선택 다각형 중심을 회전/확대 피벗으로 사용하되, 피벗의 원본 이미지 기준 오프셋을 아이템 변환에 더해 정지 시 선택 픽셀이 원래 이미지 위치에 남아야 합니다. 미리보기 캔버스에서 오른쪽 버튼 드래그는 현재 선택 레이어의 위치를 조절하고, 가운데 버튼 드래그는 화면 패닝으로 유지합니다.
+
+아이템 위치는 캔버스 폭/높이 기준 각각 -300%~300%까지 배치할 수 있고, 크기는 0.1×~5×까지 조절합니다. 프로젝트 파일 검증, 미리보기 렌더링, 드래그 이동, 속성 슬라이더는 같은 범위를 사용합니다. 속성 패널의 기본 글자 크기도 읽기 쉬운 10~12px로 조정했습니다.

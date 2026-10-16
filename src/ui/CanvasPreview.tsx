@@ -22,24 +22,18 @@ interface CanvasPreviewProps {
   onClosePath: (points: Array<{ x: number; y: number }>) => void
   onUpdatePoints: (itemId: string, points: Point[]) => void
   onBeginBoundaryEdit: () => void
+  onBeginItemMove: () => void
+  onUpdateItemPosition: (itemId: string, positionX: number, positionY: number) => void
 }
 interface ViewSize { width: number; height: number }
 interface Point { x: number; y: number }
-const workspaceInset = (1 - WORKSPACE_CONTENT_RATIO) / 2
-const workspaceToCanvas = (point: Point): Point => ({
-  x: Math.max(0, Math.min(1, (point.x - workspaceInset) / WORKSPACE_CONTENT_RATIO)),
-  y: Math.max(0, Math.min(1, (point.y - workspaceInset) / WORKSPACE_CONTENT_RATIO)),
-})
-const canvasToWorkspace = (point: Point): Point => ({
-  x: workspaceInset + point.x * WORKSPACE_CONTENT_RATIO,
-  y: workspaceInset + point.y * WORKSPACE_CONTENT_RATIO,
-})
 
-export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth, canvasHeight, settings, playing, onError, items, selectedItemId, tool, showGuides, boundaryEdit, onClosePath, onUpdatePoints, onBeginBoundaryEdit }: CanvasPreviewProps) {
+export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth, canvasHeight, settings, playing, onError, items, selectedItemId, tool, showGuides, boundaryEdit, onClosePath, onUpdatePoints, onBeginBoundaryEdit, onBeginItemMove, onUpdateItemPosition }: CanvasPreviewProps) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const draft = useRef<Point[]>([])
   const panPointer = useRef<{ id: number; x: number; y: number; panX: number; panY: number } | undefined>(undefined)
+  const itemMovePointer = useRef<{ id: number; itemId: string; x: number; y: number; positionX: number; positionY: number; contentWidth: number; contentHeight: number } | undefined>(undefined)
   const vertexPointer = useRef<{ id: number; itemId: string; index: number } | undefined>(undefined)
   const previewState = useRef({ settings, playing })
   const [draftPoints, setDraftPoints] = useState<Point[]>([])
@@ -93,7 +87,7 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
 
   const pointFromEvent = (event: PointerEvent<SVGSVGElement>): Point => {
     const rect = event.currentTarget.getBoundingClientRect()
-    return workspaceToCanvas({ x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height })
+    return { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height }
   }
   const closePath = () => {
     if (draft.current.length < 3) return
@@ -119,10 +113,25 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
     setZoom(nextZoom)
   }
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (event.button !== 1) return
+    if (event.button === 1) {
+      event.preventDefault()
+      event.currentTarget.setPointerCapture(event.pointerId)
+      panPointer.current = { id: event.pointerId, x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y }
+      return
+    }
+    if (event.button !== 2) return
     event.preventDefault()
+    const canvas = canvasRef.current
+    const item = items.find(value => value.id === selectedItemId)
+    if (!canvas || !item || item.empty) return
+    const rect = canvas.getBoundingClientRect()
+    onBeginItemMove()
     event.currentTarget.setPointerCapture(event.pointerId)
-    panPointer.current = { id: event.pointerId, x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y }
+    itemMovePointer.current = {
+      id: event.pointerId, itemId: item.id, x: event.clientX, y: event.clientY,
+      positionX: item.positionX ?? 0, positionY: item.positionY ?? 0,
+      contentWidth: rect.width * WORKSPACE_CONTENT_RATIO, contentHeight: rect.height * WORKSPACE_CONTENT_RATIO,
+    }
   }
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const vertexDrag = vertexPointer.current
@@ -130,7 +139,7 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
       const svg = event.currentTarget.querySelector('svg.selection-overlay')
       if (!svg) return
       const rect = svg.getBoundingClientRect()
-      const canvasPoint = workspaceToCanvas({ x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height })
+      const canvasPoint = { x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height }
       const item = items.find(value => value.id === vertexDrag.itemId)
       if (!item?.points) return
       const assetWidth = item.imageWidth ?? imageWidth
@@ -146,13 +155,19 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
     const start = panPointer.current
     if (start?.id === event.pointerId) {
       setPan({ x: start.panX + event.clientX - start.x, y: start.panY + event.clientY - start.y })
+      return
     }
+    const move = itemMovePointer.current
+    if (move?.id === event.pointerId) onUpdateItemPosition(move.itemId,
+      Math.max(-300, Math.min(300, move.positionX + (event.clientX - move.x) / move.contentWidth * 100)),
+      Math.max(-300, Math.min(300, move.positionY + (event.clientY - move.y) / move.contentHeight * 100)))
   }
   const finishPan = (event: PointerEvent<HTMLDivElement>) => {
     if (vertexPointer.current?.id === event.pointerId) vertexPointer.current = undefined
     if (panPointer.current?.id === event.pointerId) panPointer.current = undefined
+    if (itemMovePointer.current?.id === event.pointerId) itemMovePointer.current = undefined
   }
-  const draftPath = draftPoints.map((point, index) => { const viewPoint = canvasToWorkspace(point); return `${index ? 'L' : 'M'} ${viewPoint.x * 100} ${viewPoint.y * 100}` }).join(' ')
+  const draftPath = draftPoints.map((point, index) => `${index ? 'L' : 'M'} ${point.x * 100} ${point.y * 100}`).join(' ')
   const getItemOutline = (item: MotionItem) => {
     const assetWidth = item.imageWidth ?? imageWidth
     const assetHeight = item.imageHeight ?? imageHeight
@@ -165,10 +180,10 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
     const points = item.points?.length
       ? smoothClosedPolygon(item.points, item.edgeSmoothing ?? 0).map(mapPoint)
       : [mapPoint({ x: 0, y: 0 }), mapPoint({ x: 1, y: 0 }), mapPoint({ x: 1, y: 1 }), mapPoint({ x: 0, y: 1 })]
-    return normalizedPolygonPath(points.map(canvasToWorkspace))
+    return normalizedPolygonPath(points)
   }
 
-  return <div ref={viewportRef} className={`preview-viewport ${tool === 'pen' ? 'pen-active' : ''}`} onWheel={handleWheel} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={finishPan} onPointerCancel={finishPan}>
+  return <div ref={viewportRef} className={`preview-viewport ${tool === 'pen' ? 'pen-active' : ''}`} onWheel={handleWheel} onContextMenu={event => event.preventDefault()} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={finishPan} onPointerCancel={finishPan}>
     {fitScale > 0 && <div className="preview-board" style={{ width: boardWidth, height: boardHeight, transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})` }}>
       <canvas ref={canvasRef} className="animated-preview" aria-label="움직이는 캐릭터 미리보기" />
       {showGuides && <svg className={`selection-overlay tool-${tool} ${boundaryEdit ? 'boundary-edit' : ''}`} viewBox="0 0 100 100" preserveAspectRatio="none" tabIndex={tool === 'pen' ? 0 : -1}
@@ -188,10 +203,10 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
         {boundaryEdit && selectedItemId && items.find(item => item.id === selectedItemId)?.points?.map((point, index) => {
           const item = items.find(value => value.id === selectedItemId)!
           const assetWidth = item.imageWidth ?? imageWidth, assetHeight = item.imageHeight ?? imageHeight
-          const viewPoint = canvasToWorkspace({
+          const viewPoint = {
             x: 0.5 + (item.positionX ?? 0) / 100 + (point.x - 0.5) * assetWidth * (item.sizeMultiplier ?? 1) / canvasWidth,
             y: 0.5 + (item.positionY ?? 0) / 100 + (point.y - 0.5) * assetHeight * (item.sizeMultiplier ?? 1) / canvasHeight,
-          })
+          }
           const x = viewPoint.x * 100, y = viewPoint.y * 100
           return <ellipse key={`${selectedItemId}-vertex-${index}`} cx={x} cy={y} rx={2.2 * 100 / Math.max(1, boardWidth)} ry={2.2 * 100 / Math.max(1, boardHeight)} className="boundary-vertex" onPointerDown={event => {
           if (event.button !== 0) return
@@ -203,9 +218,9 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
         }} />
         })}
         {draftPath && <>
-          <path d={`${draftPath}${cursor ? ` L ${canvasToWorkspace(cursor).x * 100} ${canvasToWorkspace(cursor).y * 100}` : ''}`} className="pen-draft" />
-          {draftPoints.map((point, index) => { const viewPoint = canvasToWorkspace(point); return <ellipse key={index} cx={viewPoint.x * 100} cy={viewPoint.y * 100} rx={1.8 * 100 / Math.max(1, boardWidth)} ry={1.8 * 100 / Math.max(1, boardHeight)} className="pen-point" /> })}
-          {draftPoints.length >= 3 && (() => { const viewPoint = canvasToWorkspace(draftPoints[0]); return <ellipse cx={viewPoint.x * 100} cy={viewPoint.y * 100} rx={2.4 * 100 / Math.max(1, boardWidth)} ry={2.4 * 100 / Math.max(1, boardHeight)} className="close-point" /> })()}
+          <path d={`${draftPath}${cursor ? ` L ${cursor.x * 100} ${cursor.y * 100}` : ''}`} className="pen-draft" />
+          {draftPoints.map((point, index) => <ellipse key={index} cx={point.x * 100} cy={point.y * 100} rx={1.8 * 100 / Math.max(1, boardWidth)} ry={1.8 * 100 / Math.max(1, boardHeight)} className="pen-point" />)}
+          {draftPoints.length >= 3 && <ellipse cx={draftPoints[0].x * 100} cy={draftPoints[0].y * 100} rx={2.4 * 100 / Math.max(1, boardWidth)} ry={2.4 * 100 / Math.max(1, boardHeight)} className="close-point" />}
         </>}
       </svg>}
     </div>}
@@ -215,6 +230,6 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
       <button title="확대" aria-label="확대" onClick={() => setZoom(value => Math.min(16, value * 1.2))}>+</button>
       <button title="화면에 맞추기" aria-label="화면에 맞추기" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>맞춤</button>
     </div>}
-    {showGuides && <span className="pan-hint">작업 여유 각 {WORKSPACE_MARGIN_RATIO * 100}% · 휠: 확대/축소 · 가운데 버튼 드래그: 이동</span>}
+    {showGuides && <span className="pan-hint">작업 여유 각 {WORKSPACE_MARGIN_RATIO * 100}% · 휠: 확대/축소 · 가운데 드래그: 화면 이동 · 오른쪽 드래그: 선택 레이어 이동</span>}
   </div>
 }

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu } from 'electron'
 import path from 'node:path'
 import { readFile, writeFile } from 'node:fs/promises'
 
@@ -10,6 +10,7 @@ const createWindow = () => {
     height: 920,
     minWidth: 1080,
     minHeight: 680,
+    autoHideMenuBar: true,
     backgroundColor: '#111217',
     title: 'Letmorph Studio',
     webPreferences: {
@@ -33,8 +34,8 @@ ipcMain.handle('animation:save', async (event, payload: unknown) => {
   if (!mainWindow || event.sender !== mainWindow.webContents || !isSavePayload(payload)) {
     throw new Error('Invalid save request.')
   }
-  if (payload.bytes.byteLength === 0 || payload.bytes.byteLength > 100 * 1024 * 1024) {
-    throw new Error('The animation file size is not supported.')
+  if (payload.bytes.byteLength === 0 || payload.bytes.byteLength > 512 * 1024 * 1024) {
+    throw new Error('The animation file exceeds the 512 MB export size limit.')
   }
 
   const safeName = payload.suggestedName.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\.(mp4|webm)$/i, '') + `.${payload.extension}`
@@ -104,6 +105,7 @@ function isSavePayload(value: unknown): value is { bytes: Uint8Array; suggestedN
 
 app.whenReady().then(() => {
   app.setName('Letmorph Studio')
+  Menu.setApplicationMenu(null)
   createWindow()
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

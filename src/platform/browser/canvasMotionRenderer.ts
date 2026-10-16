@@ -168,11 +168,11 @@ function drawItemAt(
   }
   context.save()
   try {
+    const sizeMultiplier = Math.max(0.1, Math.min(5, item.sizeMultiplier ?? 1))
     context.globalAlpha *= alpha
-    context.translate(imageRect.x + imageRect.width / 2 + (item.positionX ?? 0) / 100 * imageRect.width + pose.x,
-      imageRect.y + imageRect.height / 2 + (item.positionY ?? 0) / 100 * imageRect.height + pose.y)
+    context.translate(imageRect.x + imageRect.width / 2 + (item.positionX ?? 0) / 100 * imageRect.width + (pivotX - 0.5) * width * sizeMultiplier + pose.x,
+      imageRect.y + imageRect.height / 2 + (item.positionY ?? 0) / 100 * imageRect.height + (pivotY - 0.5) * height * sizeMultiplier + pose.y)
     context.rotate(pose.rotation)
-    const sizeMultiplier = Math.max(0.5, Math.min(2, item.sizeMultiplier ?? 1))
     context.scale(pose.scale * sizeMultiplier, pose.scale * sizeMultiplier)
     if (item.morphMode && (item.morphAmount ?? 0) > 0) {
       context.translate(-pivotX * width, -pivotY * height)
