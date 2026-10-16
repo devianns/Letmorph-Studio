@@ -13,6 +13,8 @@ The product journey and implementation gates are defined in [user-flow.md](user-
 - [x] Establish Vite + React + TypeScript + Electron scaffold and secure preload boundary.
 - [x] Add a persistent light/dark appearance toggle in the top-right app toolbar.
 - [x] Keep pen input active when guides are hidden and preserve pen mode when switching populated layers.
+- [x] Bind each in-progress pen path to its starting layer, cancel it on target changes, and show the active drawing target in the UI.
+- [x] Transform pen paths into selected-layer coordinates and clip polygon geometry to that layer's image bounds.
 - [x] Apply uniform user-facing names and layer controls, and reduce spatial-morph tile seams in rendered output.
 - [x] Add shell UI with Import, Parts, Rig, Animate, and Export workspace navigation.
 

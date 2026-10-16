@@ -19,7 +19,7 @@ interface CanvasPreviewProps {
   tool: EditorTool
   showGuides: boolean
   boundaryEdit: boolean
-  onClosePath: (points: Array<{ x: number; y: number }>) => void
+  onClosePath: (itemId: string, points: Array<{ x: number; y: number }>) => void
   onUpdatePoints: (itemId: string, points: Point[]) => void
   onBeginBoundaryEdit: () => void
   onBeginItemMove: () => void
@@ -32,6 +32,7 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
   const viewportRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const draft = useRef<Point[]>([])
+  const draftTargetId = useRef<string | undefined>(undefined)
   const panPointer = useRef<{ id: number; x: number; y: number; panX: number; panY: number } | undefined>(undefined)
   const itemMovePointer = useRef<{ id: number; itemId: string; x: number; y: number; positionX: number; positionY: number; contentWidth: number; contentHeight: number } | undefined>(undefined)
   const vertexPointer = useRef<{ id: number; itemId: string; index: number } | undefined>(undefined)
@@ -75,13 +76,21 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
 
   useEffect(() => {
     draft.current = []
+    draftTargetId.current = undefined
     setDraftPoints([])
     setCursor(undefined)
   }, [tool])
+  useLayoutEffect(() => {
+    draft.current = []
+    draftTargetId.current = undefined
+    setDraftPoints([])
+    setCursor(undefined)
+  }, [selectedItemId])
   useEffect(() => {
     setZoom(1)
     setPan({ x: 0, y: 0 })
     draft.current = []
+    draftTargetId.current = undefined
     setDraftPoints([])
   }, [sourceUrl])
 
@@ -91,15 +100,18 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
   }
   const closePath = () => {
     if (draft.current.length < 3) return
-    onClosePath(draft.current)
+    const targetId = draftTargetId.current ?? selectedItemId
+    if (!targetId) return
+    onClosePath(targetId, draft.current)
     draft.current = []
+    draftTargetId.current = undefined
     setDraftPoints([])
     setCursor(undefined)
   }
   const handleKeyDown = (event: KeyboardEvent<SVGSVGElement>) => {
     if (tool !== 'pen') return
     if (event.key === 'Enter') { event.preventDefault(); closePath() }
-    if (event.key === 'Escape') { draft.current = []; setDraftPoints([]); setCursor(undefined) }
+    if (event.key === 'Escape') { draft.current = []; draftTargetId.current = undefined; setDraftPoints([]); setCursor(undefined) }
     if (event.key === 'Backspace') { event.preventDefault(); draft.current = draft.current.slice(0, -1); setDraftPoints([...draft.current]) }
   }
   const handleWheel = (event: WheelEvent<HTMLDivElement>) => {
@@ -189,6 +201,8 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
       {(showGuides || tool === 'pen') && <svg className={`selection-overlay tool-${tool} ${boundaryEdit ? 'boundary-edit' : ''}`} viewBox="0 0 100 100" preserveAspectRatio="none" tabIndex={tool === 'pen' ? 0 : -1}
         onPointerDown={event => {
           if (tool !== 'pen' || event.button !== 0) return
+          if (!selectedItemId) return
+          if (!draft.current.length) draftTargetId.current = selectedItemId
           const point = pointFromEvent(event)
           const first = draft.current[0]
           if (first && draft.current.length >= 3 && Math.hypot(point.x - first.x, point.y - first.y) < 0.035) { closePath(); return }
