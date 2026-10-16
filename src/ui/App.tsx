@@ -189,7 +189,7 @@ export default function App() {
     commitItems(next)
   }
   const applyWholeSelection = () => {
-    if (!selectedItem || selectedItem.source) return
+    if (!selectedItem) return
     updateSelected({ points: undefined, empty: false })
     setEditTargetId(undefined)
     setTool('select')
@@ -201,7 +201,7 @@ export default function App() {
   const applyDrawnRegion = (points: Array<{ x: number; y: number }>) => {
     const targetId = editTargetId ?? selectedItemId
     const target = items.find(item => item.id === targetId)
-    if (!target || target.source || !project) return
+    if (!target || !project) return
     const assetWidth = target.imageWidth ?? project.sourceImage.width
     const assetHeight = target.imageHeight ?? project.sourceImage.height
     const size = target.sizeMultiplier ?? 1
@@ -300,12 +300,12 @@ export default function App() {
           <div className="section-label motion-label">도구</div>
           <div className="tool-list" role="toolbar" aria-label="편집 도구">
             <button className={`tool-button ${tool === 'select' ? 'selected' : ''}`} onClick={() => setTool('select')}><b>↖</b><span>선택</span></button>
-            <button className="tool-button" disabled={!selectedItem || selectedItem.source} title="빈 아이템을 추가하고 선택한 뒤 그릴 수 있어요" onClick={() => { setEditTargetId(undefined); setTool('pen') }}><b>✎</b><span>선택 아이템 그리기</span></button>
-            <button className="tool-button" disabled={!selectedItem || selectedItem.source} onClick={applyWholeSelection}><b>▣</b><span>전체 영역 적용</span></button>
+            <button className="tool-button" disabled={!selectedItem} title="선택한 아이템에 영역을 그립니다" onClick={() => { setEditTargetId(undefined); setTool('pen') }}><b>✎</b><span>선택 아이템 그리기</span></button>
+            <button className="tool-button" disabled={!selectedItem} onClick={applyWholeSelection}><b>▣</b><span>전체 영역 적용</span></button>
             <button className="tool-button add-layer-button" onClick={addEmptyItem}><b>＋</b><span>아이템 추가</span></button>
           </div>
           {!items.some(item => item.source) && <button className="selection-button restore-base" onClick={restoreBaseItem}>기본 이미지 레이어 복구</button>}
-          {tool === 'pen' && <p className="selection-hint">{selectedItem?.source ? '기본 이미지에는 영역을 그릴 수 없어요. + 아이템을 추가해 선택하세요.' : `현재 아이템 “${selectedItem?.name ?? '없음'}”에 영역을 그립니다. 점을 3개 이상 찍고 시작점을 다시 누르거나 Enter를 누르면 적용돼요. Backspace는 점 하나 취소, Esc는 그리기 취소예요.`}</p>}
+          {tool === 'pen' && <p className="selection-hint">{selectedItem?.source ? '기본 이미지는 그대로 유지되고, 그린 영역이 움직이는 복사 레이어로 추가됩니다. 점을 3개 이상 찍고 Enter를 누르세요.' : `현재 아이템 “${selectedItem?.name ?? '없음'}”에 영역을 그립니다. 점을 3개 이상 찍고 시작점을 다시 누르거나 Enter를 누르면 적용돼요. Backspace는 점 하나 취소, Esc는 그리기 취소예요.`}</p>}
           <div className="section-label motion-label">아이템 목록 <span className="item-count">{items.length}</span></div>
           <button className="selection-button add-layer-action" onClick={addEmptyItem}>＋ 빈 아이템 추가</button>
           <button className="selection-button add-layer-action" onClick={() => imageLayerInputRef.current?.click()}>＋ 이미지 레이어 가져오기</button>

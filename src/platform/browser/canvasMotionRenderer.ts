@@ -150,14 +150,14 @@ function drawItemAt(
   if (!layerImage) return
   const width = layerImage.naturalWidth * imageRect.width / canvasWidth
   const height = layerImage.naturalHeight * imageRect.height / canvasHeight
-  const patch = item.source || (item.imageDataUrl && !item.points?.length)
+  const patch = (item.source && !item.points?.length) || (item.imageDataUrl && !item.points?.length)
     ? layerImage
     : getItemPatch(layerImage, item, width, height)
   if (!patch || alpha <= 0) return
   const pose = evaluateImageMotion(timeMs, imageRect.width, imageRect.height, item)
   let pivotX = 0.5
   let pivotY = 0.5
-  if (!item.source && item.points?.length) {
+  if (item.points?.length) {
     const polygon = smoothClosedPolygon(item.points, item.edgeSmoothing ?? 0)
     const bounds = polygon.reduce((value, point) => ({
       left: Math.min(value.left, point.x), right: Math.max(value.right, point.x),
@@ -220,7 +220,7 @@ export function renderMotionFrame(
   const imageRect = getWorkspaceContentRect(canvas.width, canvas.height)
   const activeMasks = new Map<HTMLImageElement, Set<string>>()
   for (const item of items) {
-    if (!item.visible || item.source || item.empty || (item.imageDataUrl && !item.points?.length)
+    if (!item.visible || (item.source && (!item.points || item.points.length < 3)) || item.empty || (item.imageDataUrl && !item.points?.length)
       || (item.points && item.points.length < 3)) continue
     const layerImage = getItemImage(item, image)
     if (!layerImage) continue
@@ -238,7 +238,13 @@ export function renderMotionFrame(
   for (const item of items) {
     if (!item.visible || item.empty || (!item.source && item.points && item.points.length < 3)) continue
     try {
-      drawItemWithTrail(context, image, item, timeMs, canvasWidth, canvasHeight)
+      if (item.source && item.points && item.points.length >= 3) {
+        // Keep the source artwork as an unchanged underlay. Animate only the
+        // selected pixels as a masked copy so moving a base-image region never
+        // exposes the project background.
+        context.drawImage(image, imageRect.x, imageRect.y, imageRect.width, imageRect.height)
+        drawItemWithTrail(context, image, { ...item, source: false }, timeMs, canvasWidth, canvasHeight)
+      } else drawItemWithTrail(context, image, item, timeMs, canvasWidth, canvasHeight)
     } catch (cause) {
       onItemRenderError?.(item, cause)
     }

@@ -170,3 +170,5 @@ Manually created motion items can have empty: true before any content region is 
 
 
 Projects may contain multiple embedded image layers. Each image layer stores a validated data URL and intrinsic dimensions on its MotionItem; the portable project JSON includes these fields, while the renderer decodes each asset once and caches it with a bounded cache. Layer order is item array order. Canvas dimensions are project state and determine preview/export render surfaces; layer images are drawn at intrinsic pixel size (scaled only for output resolution) around the canvas center plus per-item position offsets. Canvas resizing therefore reveals or crops content without destructively changing the source image.
+
+기본 이미지 아이템도 전체 모핑 및 펜 영역 모핑을 지원합니다. 기본 이미지에 펜 영역이 저장되면 원본을 정지 상태로 밑에 유지하고, 마스크된 선택 픽셀만 움직이는 복사본으로 렌더링해 영역이 이동해도 배경이 비치지 않게 합니다. 전체 영역 적용 시에는 선택 마스크를 해제해 기본 이미지 전체에 아이템 모션/공간 모핑을 적용합니다. 미리보기와 영상 내보내기는 이 렌더 경로를 공유합니다.
