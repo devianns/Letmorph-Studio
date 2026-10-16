@@ -1,5 +1,5 @@
 import type { ImageMotionSettings, MotionItem } from '../../engine/evaluateImageMotion'
-import { renderMotionFrame } from './canvasMotionRenderer'
+import { preloadMotionImages, renderMotionFrame } from './canvasMotionRenderer'
 import { WORKSPACE_SCALE } from '../../engine/workspaceLayout'
 
 export interface VideoOptions {
@@ -30,11 +30,14 @@ export async function recordVideo(
   const image = new Image()
   image.src = sourceUrl
   await image.decode()
+  await preloadMotionImages(settings)
 
-  const scale = Math.min(1, options.maxSide / Math.max(image.naturalWidth, image.naturalHeight))
+  const canvasWidth = settings.canvasWidth ?? image.naturalWidth
+  const canvasHeight = settings.canvasHeight ?? image.naturalHeight
+  const scale = Math.min(1, options.maxSide / Math.max(canvasWidth, canvasHeight))
   const canvas = document.createElement('canvas')
-  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale * WORKSPACE_SCALE))
-  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale * WORKSPACE_SCALE))
+  canvas.width = Math.max(1, Math.round(canvasWidth * scale * WORKSPACE_SCALE))
+  canvas.height = Math.max(1, Math.round(canvasHeight * scale * WORKSPACE_SCALE))
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Canvas 2D rendering is unavailable.')
   context.imageSmoothingEnabled = true

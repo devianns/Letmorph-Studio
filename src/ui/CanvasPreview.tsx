@@ -2,13 +2,15 @@
 import type { ImageMotionSettings, MotionItem } from '../engine/evaluateImageMotion'
 import { normalizedPolygonPath, smoothClosedPolygon } from '../engine/smoothPolygon'
 import { startMotionPreview } from '../platform/browser/canvasMotionRenderer'
-import { getWorkspaceDimensions, WORKSPACE_MARGIN_RATIO } from '../engine/workspaceLayout'
+import { getWorkspaceDimensions, WORKSPACE_CONTENT_RATIO, WORKSPACE_MARGIN_RATIO } from '../engine/workspaceLayout'
 
 type EditorTool = 'select' | 'pen'
 interface CanvasPreviewProps {
   sourceUrl: string
   imageWidth: number
   imageHeight: number
+  canvasWidth: number
+  canvasHeight: number
   settings: ImageMotionSettings
   playing: boolean
   onError: (message: string) => void
@@ -23,8 +25,17 @@ interface CanvasPreviewProps {
 }
 interface ViewSize { width: number; height: number }
 interface Point { x: number; y: number }
+const workspaceInset = (1 - WORKSPACE_CONTENT_RATIO) / 2
+const workspaceToCanvas = (point: Point): Point => ({
+  x: Math.max(0, Math.min(1, (point.x - workspaceInset) / WORKSPACE_CONTENT_RATIO)),
+  y: Math.max(0, Math.min(1, (point.y - workspaceInset) / WORKSPACE_CONTENT_RATIO)),
+})
+const canvasToWorkspace = (point: Point): Point => ({
+  x: workspaceInset + point.x * WORKSPACE_CONTENT_RATIO,
+  y: workspaceInset + point.y * WORKSPACE_CONTENT_RATIO,
+})
 
-export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, settings, playing, onError, items, selectedItemId, tool, showGuides, boundaryEdit, onClosePath, onUpdatePoints, onBeginBoundaryEdit }: CanvasPreviewProps) {
+export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth, canvasHeight, settings, playing, onError, items, selectedItemId, tool, showGuides, boundaryEdit, onClosePath, onUpdatePoints, onBeginBoundaryEdit }: CanvasPreviewProps) {
   const viewportRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const draft = useRef<Point[]>([])
@@ -37,7 +48,7 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, settings, pl
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   previewState.current = { settings, playing }
-  const workspaceSize = getWorkspaceDimensions(imageWidth, imageHeight)
+  const workspaceSize = getWorkspaceDimensions(canvasWidth, canvasHeight)
   const fitScale = viewportSize.width && viewportSize.height
     ? Math.min(viewportSize.width * 0.92 / workspaceSize.width, viewportSize.height * 0.92 / workspaceSize.height)
     : 0
@@ -66,7 +77,7 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, settings, pl
       .then(stopPreview => { if (cancelled) stopPreview(); else stop = stopPreview })
       .catch(() => onError('미리보기를 시작하지 못했어요. 다른 이미지로 다시 시도해 주세요.'))
     return () => { cancelled = true; stop?.() }
-  }, [fitScale, onError, sourceUrl])
+  }, [canvasHeight, canvasWidth, fitScale, onError, sourceUrl])
 
   useEffect(() => {
     draft.current = []
@@ -82,7 +93,7 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, settings, pl
 
   const pointFromEvent = (event: PointerEvent<SVGSVGElement>): Point => {
     const rect = event.currentTarget.getBoundingClientRect()
-    return { x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)), y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)) }
+    return workspaceToCanvas({ x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height })
   }
   const closePath = () => {
     if (draft.current.length < 3) return
@@ -119,9 +130,15 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, settings, pl
       const svg = event.currentTarget.querySelector('svg.selection-overlay')
       if (!svg) return
       const rect = svg.getBoundingClientRect()
-      const nextPoint = { x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)), y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)) }
+      const canvasPoint = workspaceToCanvas({ x: (event.clientX - rect.left) / rect.width, y: (event.clientY - rect.top) / rect.height })
       const item = items.find(value => value.id === vertexDrag.itemId)
       if (!item?.points) return
+      const assetWidth = item.imageWidth ?? imageWidth
+      const assetHeight = item.imageHeight ?? imageHeight
+      const nextPoint = {
+        x: 0.5 + (canvasPoint.x - 0.5 - (item.positionX ?? 0) / 100) * canvasWidth / (assetWidth * (item.sizeMultiplier ?? 1)),
+        y: 0.5 + (canvasPoint.y - 0.5 - (item.positionY ?? 0) / 100) * canvasHeight / (assetHeight * (item.sizeMultiplier ?? 1)),
+      }
       const points = item.points.map((point, index) => index === vertexDrag.index ? nextPoint : point)
       onUpdatePoints(item.id, points)
       return
@@ -135,8 +152,21 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, settings, pl
     if (vertexPointer.current?.id === event.pointerId) vertexPointer.current = undefined
     if (panPointer.current?.id === event.pointerId) panPointer.current = undefined
   }
-  const draftPath = draftPoints.map((point, index) => `${index ? 'L' : 'M'} ${point.x * 100} ${point.y * 100}`).join(' ')
-  const fullImagePath = 'M 0 0 L 100 0 L 100 100 L 0 100 Z'
+  const draftPath = draftPoints.map((point, index) => { const viewPoint = canvasToWorkspace(point); return `${index ? 'L' : 'M'} ${viewPoint.x * 100} ${viewPoint.y * 100}` }).join(' ')
+  const getItemOutline = (item: MotionItem) => {
+    const assetWidth = item.imageWidth ?? imageWidth
+    const assetHeight = item.imageHeight ?? imageHeight
+    const centerX = 0.5 + (item.positionX ?? 0) / 100
+    const centerY = 0.5 + (item.positionY ?? 0) / 100
+    const mapPoint = (point: Point) => ({
+      x: centerX + (point.x - 0.5) * assetWidth * (item.sizeMultiplier ?? 1) / canvasWidth,
+      y: centerY + (point.y - 0.5) * assetHeight * (item.sizeMultiplier ?? 1) / canvasHeight,
+    })
+    const points = item.points?.length
+      ? smoothClosedPolygon(item.points, item.edgeSmoothing ?? 0).map(mapPoint)
+      : [mapPoint({ x: 0, y: 0 }), mapPoint({ x: 1, y: 0 }), mapPoint({ x: 1, y: 1 }), mapPoint({ x: 0, y: 1 })]
+    return normalizedPolygonPath(points.map(canvasToWorkspace))
+  }
 
   return <div ref={viewportRef} className={`preview-viewport ${tool === 'pen' ? 'pen-active' : ''}`} onWheel={handleWheel} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={finishPan} onPointerCancel={finishPan}>
     {fitScale > 0 && <div className="preview-board" style={{ width: boardWidth, height: boardHeight, transform: `translate(calc(-50% + ${pan.x}px), calc(-50% + ${pan.y}px)) scale(${zoom})` }}>
@@ -154,19 +184,28 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, settings, pl
         }}
         onPointerMove={event => { if (tool === 'pen' && draft.current.length) setCursor(pointFromEvent(event)) }}
         onKeyDown={handleKeyDown}>
-        {items.filter(item => !item.empty).map(item => <path key={item.id} d={item.points?.length ? normalizedPolygonPath(smoothClosedPolygon(item.points, item.edgeSmoothing ?? 0)) : fullImagePath} className={`item-outline ${selectedItemId === item.id ? 'active' : ''} ${item.visible ? '' : 'hidden'}`} />)}
-        {boundaryEdit && selectedItemId && items.find(item => item.id === selectedItemId)?.points?.map((point, index) => <ellipse key={`${selectedItemId}-vertex-${index}`} cx={point.x * 100} cy={point.y * 100} rx={2.2 * 100 / Math.max(1, boardWidth)} ry={2.2 * 100 / Math.max(1, boardHeight)} className="boundary-vertex" onPointerDown={event => {
+        {items.filter(item => !item.empty).map(item => <path key={item.id} d={getItemOutline(item)} className={`item-outline ${selectedItemId === item.id ? 'active' : ''} ${item.visible ? '' : 'hidden'}`} />)}
+        {boundaryEdit && selectedItemId && items.find(item => item.id === selectedItemId)?.points?.map((point, index) => {
+          const item = items.find(value => value.id === selectedItemId)!
+          const assetWidth = item.imageWidth ?? imageWidth, assetHeight = item.imageHeight ?? imageHeight
+          const viewPoint = canvasToWorkspace({
+            x: 0.5 + (item.positionX ?? 0) / 100 + (point.x - 0.5) * assetWidth * (item.sizeMultiplier ?? 1) / canvasWidth,
+            y: 0.5 + (item.positionY ?? 0) / 100 + (point.y - 0.5) * assetHeight * (item.sizeMultiplier ?? 1) / canvasHeight,
+          })
+          const x = viewPoint.x * 100, y = viewPoint.y * 100
+          return <ellipse key={`${selectedItemId}-vertex-${index}`} cx={x} cy={y} rx={2.2 * 100 / Math.max(1, boardWidth)} ry={2.2 * 100 / Math.max(1, boardHeight)} className="boundary-vertex" onPointerDown={event => {
           if (event.button !== 0) return
           event.preventDefault()
           event.stopPropagation()
           onBeginBoundaryEdit()
           vertexPointer.current = { id: event.pointerId, itemId: selectedItemId, index }
           event.currentTarget.setPointerCapture(event.pointerId)
-        }} />)}
+        }} />
+        })}
         {draftPath && <>
-          <path d={`${draftPath}${cursor ? ` L ${cursor.x * 100} ${cursor.y * 100}` : ''}`} className="pen-draft" />
-          {draftPoints.map((point, index) => <ellipse key={index} cx={point.x * 100} cy={point.y * 100} rx={1.8 * 100 / Math.max(1, boardWidth)} ry={1.8 * 100 / Math.max(1, boardHeight)} className="pen-point" />)}
-          {draftPoints.length >= 3 && <ellipse cx={draftPoints[0].x * 100} cy={draftPoints[0].y * 100} rx={2.4 * 100 / Math.max(1, boardWidth)} ry={2.4 * 100 / Math.max(1, boardHeight)} className="close-point" />}
+          <path d={`${draftPath}${cursor ? ` L ${canvasToWorkspace(cursor).x * 100} ${canvasToWorkspace(cursor).y * 100}` : ''}`} className="pen-draft" />
+          {draftPoints.map((point, index) => { const viewPoint = canvasToWorkspace(point); return <ellipse key={index} cx={viewPoint.x * 100} cy={viewPoint.y * 100} rx={1.8 * 100 / Math.max(1, boardWidth)} ry={1.8 * 100 / Math.max(1, boardHeight)} className="pen-point" /> })}
+          {draftPoints.length >= 3 && (() => { const viewPoint = canvasToWorkspace(draftPoints[0]); return <ellipse cx={viewPoint.x * 100} cy={viewPoint.y * 100} rx={2.4 * 100 / Math.max(1, boardWidth)} ry={2.4 * 100 / Math.max(1, boardHeight)} className="close-point" /> })()}
         </>}
       </svg>}
     </div>}

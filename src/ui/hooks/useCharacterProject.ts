@@ -38,7 +38,7 @@ export function useCharacterProject() {
       if (sequence !== importSequence.current) return
 
       const nextProject = restoredProject
-        ? { ...restoredProject, sourceImage: inspectedProject.sourceImage, canvas: inspectedProject.canvas }
+        ? { ...restoredProject, sourceImage: inspectedProject.sourceImage }
         : inspectedProject
 
       const nextUrl = createBrowserImagePreview(file)
@@ -67,5 +67,9 @@ export function useCharacterProject() {
     setIsLoading(false)
   }, [])
 
-  return { project, imageUrl, error, isLoading, importImage, clearProject }
+  const resizeCanvas = useCallback((width: number, height: number) => {
+    setProject(current => current ? { ...current, canvas: { width, height } } : current)
+  }, [])
+
+  return { project, imageUrl, error, isLoading, importImage, clearProject, resizeCanvas }
 }

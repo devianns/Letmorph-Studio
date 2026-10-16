@@ -4,6 +4,38 @@ import { evaluateSpatialMorph } from '../../engine/evaluateSpatialMorph'
 import { getWorkspaceContentRect, WORKSPACE_SCALE } from '../../engine/workspaceLayout'
 
 const selectionPatchCache = new WeakMap<HTMLImageElement, Map<string, HTMLCanvasElement>>()
+const itemImageCache = new Map<string, HTMLImageElement>()
+
+function getItemImage(item: MotionItem, fallback: HTMLImageElement): HTMLImageElement | undefined {
+  if (!item.imageDataUrl) return fallback
+  let image = itemImageCache.get(item.imageDataUrl)
+  if (!image) {
+    image = new Image()
+    image.src = item.imageDataUrl
+    itemImageCache.set(item.imageDataUrl, image)
+    if (itemImageCache.size > 64) {
+      const oldestKey = itemImageCache.keys().next().value
+      if (oldestKey) {
+        const oldestImage = itemImageCache.get(oldestKey)
+        if (oldestImage) oldestImage.src = ''
+        itemImageCache.delete(oldestKey)
+      }
+    }
+  }
+  return image.complete && image.naturalWidth > 0 ? image : undefined
+}
+
+export async function preloadMotionImages(settings: ImageMotionSettings): Promise<void> {
+  await Promise.all((settings.items ?? []).filter(item => item.imageDataUrl).map(item => {
+    let image = itemImageCache.get(item.imageDataUrl!)
+    if (!image) {
+      image = new Image()
+      image.src = item.imageDataUrl!
+      itemImageCache.set(item.imageDataUrl!, image)
+    }
+    return image.decode()
+  }))
+}
 
 function getItemPatchKey(item: MotionItem, width: number, height: number): string {
   return `${item.points?.map(point => `${point.x.toFixed(5)},${point.y.toFixed(5)}`).join(';') ?? 'whole-image'}|${item.edgeSmoothing ?? 0}|${item.edgeFeather ?? 0}|${width}x${height}`
@@ -108,15 +140,21 @@ function drawItemAt(
   image: HTMLImageElement,
   item: MotionItem,
   timeMs: number,
+  canvasWidth: number,
+  canvasHeight: number,
   alpha = 1,
 ): void {
   const { canvas } = context
   const imageRect = getWorkspaceContentRect(canvas.width, canvas.height)
-  const width = imageRect.width
-  const height = imageRect.height
-  const patch = item.source ? image : getItemPatch(image, item, width, height)
+  const layerImage = getItemImage(item, image)
+  if (!layerImage) return
+  const width = layerImage.naturalWidth * imageRect.width / canvasWidth
+  const height = layerImage.naturalHeight * imageRect.height / canvasHeight
+  const patch = item.source || (item.imageDataUrl && !item.points?.length)
+    ? layerImage
+    : getItemPatch(layerImage, item, width, height)
   if (!patch || alpha <= 0) return
-  const pose = evaluateImageMotion(timeMs, width, height, item)
+  const pose = evaluateImageMotion(timeMs, imageRect.width, imageRect.height, item)
   let pivotX = 0.5
   let pivotY = 0.5
   if (!item.source && item.points?.length) {
@@ -131,7 +169,8 @@ function drawItemAt(
   context.save()
   try {
     context.globalAlpha *= alpha
-    context.translate(imageRect.x + pivotX * width + pose.x, imageRect.y + pivotY * height + pose.y)
+    context.translate(imageRect.x + imageRect.width / 2 + (item.positionX ?? 0) / 100 * imageRect.width + pose.x,
+      imageRect.y + imageRect.height / 2 + (item.positionY ?? 0) / 100 * imageRect.height + pose.y)
     context.rotate(pose.rotation)
     const sizeMultiplier = Math.max(0.5, Math.min(2, item.sizeMultiplier ?? 1))
     context.scale(pose.scale * sizeMultiplier, pose.scale * sizeMultiplier)
@@ -144,16 +183,16 @@ function drawItemAt(
   }
 }
 
-function drawItemWithTrail(context: CanvasRenderingContext2D, image: HTMLImageElement, item: MotionItem, timeMs: number): void {
+function drawItemWithTrail(context: CanvasRenderingContext2D, image: HTMLImageElement, item: MotionItem, timeMs: number, canvasWidth: number, canvasHeight: number): void {
   const count = Math.max(0, Math.min(32, Math.round(item.trailCount ?? 0)))
   const intervalMs = Math.max(1, Math.min(300, item.trailIntervalMs ?? 40))
   const opacity = Math.max(0, Math.min(1, (item.trailOpacity ?? 35) / 100))
   const fade = Math.max(0, Math.min(1, (item.trailFade ?? 75) / 100))
   for (let index = count; index >= 1; index -= 1) {
     const alpha = opacity * (1 - fade * (index / count))
-    drawItemAt(context, image, item, timeMs - intervalMs * index, alpha)
+    drawItemAt(context, image, item, timeMs - intervalMs * index, canvasWidth, canvasHeight, alpha)
   }
-  drawItemAt(context, image, item, timeMs)
+  drawItemAt(context, image, item, timeMs, canvasWidth, canvasHeight)
 }
 
 export function renderMotionFrame(
@@ -169,19 +208,37 @@ export function renderMotionFrame(
   context.fillRect(0, 0, canvas.width, canvas.height)
 
   const items = settings.items ?? []
+  const activeAssetUrls = new Set(items.filter(item => item.imageDataUrl).map(item => item.imageDataUrl!))
+  for (const [url, itemImage] of itemImageCache) {
+    if (!activeAssetUrls.has(url)) {
+      itemImage.src = ''
+      itemImageCache.delete(url)
+    }
+  }
+  const canvasWidth = settings.canvasWidth ?? image.naturalWidth
+  const canvasHeight = settings.canvasHeight ?? image.naturalHeight
   const imageRect = getWorkspaceContentRect(canvas.width, canvas.height)
-  const activeMasks = new Set(items
-    .filter(item => item.visible && !item.source && !item.empty && (!item.points || item.points.length >= 3))
-    .map(item => getItemPatchKey(item, Math.max(1, Math.round(imageRect.width)), Math.max(1, Math.round(imageRect.height)))))
-  const cache = selectionPatchCache.get(image)
-  if (cache) {
-    for (const key of cache.keys()) if (!activeMasks.has(key)) cache.delete(key)
+  const activeMasks = new Map<HTMLImageElement, Set<string>>()
+  for (const item of items) {
+    if (!item.visible || item.source || item.empty || (item.imageDataUrl && !item.points?.length)
+      || (item.points && item.points.length < 3)) continue
+    const layerImage = getItemImage(item, image)
+    if (!layerImage) continue
+    const keys = activeMasks.get(layerImage) ?? new Set<string>()
+    keys.add(getItemPatchKey(item, Math.max(1, Math.round(layerImage.naturalWidth * imageRect.width / canvasWidth)),
+      Math.max(1, Math.round(layerImage.naturalHeight * imageRect.height / canvasHeight))))
+    activeMasks.set(layerImage, keys)
+  }
+  for (const cachedImage of [image, ...itemImageCache.values()]) {
+    const cache = selectionPatchCache.get(cachedImage)
+    const activeKeys = activeMasks.get(cachedImage) ?? new Set()
+    if (cache) for (const key of cache.keys()) if (!activeKeys.has(key)) cache.delete(key)
   }
 
   for (const item of items) {
     if (!item.visible || item.empty || (!item.source && item.points && item.points.length < 3)) continue
     try {
-      drawItemWithTrail(context, image, item, timeMs)
+      drawItemWithTrail(context, image, item, timeMs, canvasWidth, canvasHeight)
     } catch (cause) {
       onItemRenderError?.(item, cause)
     }
@@ -204,10 +261,13 @@ export async function startMotionPreview(
   context.imageSmoothingEnabled = true
   context.imageSmoothingQuality = 'high'
 
+  const settings = getSettings()
+  const canvasWidth = settings.canvasWidth ?? image.naturalWidth
+  const canvasHeight = settings.canvasHeight ?? image.naturalHeight
   const maxSide = 900
-  const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight))
-  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale * WORKSPACE_SCALE))
-  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale * WORKSPACE_SCALE))
+  const scale = Math.min(1, maxSide / Math.max(canvasWidth, canvasHeight))
+  canvas.width = Math.max(1, Math.round(canvasWidth * scale * WORKSPACE_SCALE))
+  canvas.height = Math.max(1, Math.round(canvasHeight * scale * WORKSPACE_SCALE))
 
   let frameId = 0
   let active = true

@@ -27,6 +27,14 @@ function isMotionItem(value: unknown): value is MotionItem {
   if (item.source !== undefined && typeof item.source !== 'boolean') return false
   if (item.empty !== undefined && typeof item.empty !== 'boolean') return false
   if (item.source === true && item.empty === true) return false
+  if (item.imageDataUrl !== undefined && (typeof item.imageDataUrl !== 'string'
+    || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=\r\n]+$/.test(item.imageDataUrl))) return false
+  for (const key of ['imageWidth', 'imageHeight'] as const) {
+    if (item[key] !== undefined && (!isFiniteNumber(item[key]) || item[key] < 1 || item[key] > 8192)) return false
+  }
+  for (const key of ['positionX', 'positionY'] as const) {
+    if (item[key] !== undefined && (!isFiniteNumber(item[key]) || item[key] < -100 || item[key] > 100)) return false
+  }
   if (item.morphMode !== undefined && !allowedMorphModes.includes(String(item.morphMode))) return false
   for (const [key, min, max] of [['morphAmount', 0, 100], ['morphAngle', 0, 360], ['morphFrequency', 1, 8], ['morphWidthBias', -100, 100], ['sizeMultiplier', 0.5, 2]] as const) {
     if (item[key] !== undefined && (!isFiniteNumber(item[key]) || item[key] < min || item[key] > max)) return false
@@ -48,8 +56,8 @@ function isCharacterProject(value: unknown): value is CharacterProject {
   const canvas = project.canvas as Record<string, unknown>
   return allowedMimeTypes.includes(String(source.mimeType))
     && typeof source.fileName === 'string'
-    && isFiniteNumber(canvas.width) && canvas.width > 0
-    && isFiniteNumber(canvas.height) && canvas.height > 0
+    && isFiniteNumber(canvas.width) && canvas.width > 0 && canvas.width <= 32768
+    && isFiniteNumber(canvas.height) && canvas.height > 0 && canvas.height <= 32768
     && Array.isArray(project.parts) && Array.isArray(project.parameters) && Array.isArray(project.clips)
 }
 
@@ -72,6 +80,9 @@ export function parsePortableProjectFile(contents: string): { archive: PortableP
     || !isCharacterProject(archive.project) || !Array.isArray(archive.items)
     || archive.items.length > 500 || !archive.items.every(isMotionItem)) {
     throw new Error('지원하지 않거나 손상된 작업 파일입니다.')
+  }
+  if (archive.items.filter(item => Boolean((item as MotionItem).imageDataUrl)).length > 32) {
+    throw new Error('이미지 레이어는 작업 파일당 최대 32개까지 지원합니다.')
   }
   const exportSettings = archive.exportSettings as Record<string, unknown> | undefined
   if (!exportSettings || !['mp4', 'webm'].includes(String(exportSettings.format))

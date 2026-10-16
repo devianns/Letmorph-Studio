@@ -167,3 +167,6 @@ Video export uses the same unwrapped elapsed-time timeline as live preview. It m
 
 
 Manually created motion items can have empty: true before any content region is assigned. Empty items remain in project data and portable archives but are skipped by the renderer and mask cache. Closing a pen selection assigns its normalized polygon to the active non-source item and clears the empty state; drawing never creates an item implicitly.
+
+
+Projects may contain multiple embedded image layers. Each image layer stores a validated data URL and intrinsic dimensions on its MotionItem; the portable project JSON includes these fields, while the renderer decodes each asset once and caches it with a bounded cache. Layer order is item array order. Canvas dimensions are project state and determine preview/export render surfaces; layer images are drawn at intrinsic pixel size (scaled only for output resolution) around the canvas center plus per-item position offsets. Canvas resizing therefore reveals or crops content without destructively changing the source image.

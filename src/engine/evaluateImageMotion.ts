@@ -14,6 +14,8 @@ export interface ImageMotionSettings extends MotionTuning {
   amount: number
   speed: number
   background: string
+  canvasWidth?: number
+  canvasHeight?: number
   items?: MotionItem[]
 }
 
@@ -26,6 +28,13 @@ export interface MotionItem extends MotionTuning {
   source?: boolean
   /** Empty manually created layer; it has no image content until a region is drawn. */
   empty?: boolean
+  /** Additional image layer stored as an embedded data URL in the project file. */
+  imageDataUrl?: string
+  imageWidth?: number
+  imageHeight?: number
+  /** Position offset from the canvas center, expressed as a percent of canvas size. */
+  positionX?: number
+  positionY?: number
   preset: ImageMotionPreset
   amount: number
   speed: number

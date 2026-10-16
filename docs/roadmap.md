@@ -84,3 +84,6 @@ The product journey and implementation gates are defined in [user-flow.md](user-
 
 
 - [x] 수동 레이어 생성과 활성 레이어 펜 편집: 빈 아이템 저장/복원, 그리기 시 자동 아이템 생성 제거
+
+
+- [x] 다중 이미지 레이어 가져오기/정렬, 레이어별 크기·위치 조절, 캔버스 크기 편집 및 작업 파일 저장/복원
