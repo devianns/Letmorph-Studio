@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "concurrently -k \"vite --host 127.0.0.1\" \"tsc -p electron/tsconfig.json --watch\" \"wait-on http://127.0.0.1:5173 electron-dist/main.js && electron .\"",
     "build": "tsc -p electron/tsconfig.json && tsc -b && vite build --configLoader runner",
+    "start:app": "electron . --production",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

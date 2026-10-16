@@ -21,7 +21,8 @@ const createWindow = () => {
   })
   mainWindow = window
 
-  if (!app.isPackaged) {
+  const useDevServer = !app.isPackaged && !process.argv.includes('--production')
+  if (useDevServer) {
     void window.loadURL('http://127.0.0.1:5173')
   } else {
     void window.loadFile(path.join(__dirname, '../dist/index.html'))

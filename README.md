@@ -25,7 +25,14 @@ npm install
 npm run dev
 ```
 
-Create a production renderer build with `npm run build`. Windows packaging is not configured yet.
+Compile the Electron main process and production renderer, then launch the built app without Vite:
+
+```sh
+npm run build
+npm run start:app
+```
+
+`npm run start:app` opens `dist/index.html` through Electron's production path. This is a local release-mode run, not a distributable installer. Windows `.exe`/installer packaging is not configured yet.
 
 ## Engine design
 
