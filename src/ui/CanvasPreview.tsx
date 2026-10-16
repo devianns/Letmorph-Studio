@@ -2,6 +2,7 @@
 import type { ImageMotionSettings, MotionItem } from '../engine/evaluateImageMotion'
 import { normalizedPolygonPath, smoothClosedPolygon } from '../engine/smoothPolygon'
 import { startMotionPreview } from '../platform/browser/canvasMotionRenderer'
+import { getWorkspaceDimensions, WORKSPACE_MARGIN_RATIO } from '../engine/workspaceLayout'
 
 type EditorTool = 'select' | 'pen'
 interface CanvasPreviewProps {
@@ -36,11 +37,12 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, settings, pl
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   previewState.current = { settings, playing }
+  const workspaceSize = getWorkspaceDimensions(imageWidth, imageHeight)
   const fitScale = viewportSize.width && viewportSize.height
-    ? Math.min(viewportSize.width * 0.92 / imageWidth, viewportSize.height * 0.92 / imageHeight)
+    ? Math.min(viewportSize.width * 0.92 / workspaceSize.width, viewportSize.height * 0.92 / workspaceSize.height)
     : 0
-  const boardWidth = imageWidth * fitScale
-  const boardHeight = imageHeight * fitScale
+  const boardWidth = workspaceSize.width * fitScale
+  const boardHeight = workspaceSize.height * fitScale
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current
@@ -172,6 +174,6 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, settings, pl
       <button title="확대" aria-label="확대" onClick={() => setZoom(value => Math.min(16, value * 1.2))}>+</button>
       <button title="화면에 맞추기" aria-label="화면에 맞추기" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }) }}>맞춤</button>
     </div>}
-    {showGuides && <span className="pan-hint">휠: 확대/축소 · 가운데 버튼 드래그: 이동</span>}
+    {showGuides && <span className="pan-hint">작업 여유 각 {WORKSPACE_MARGIN_RATIO * 100}% · 휠: 확대/축소 · 가운데 버튼 드래그: 이동</span>}
   </div>
 }

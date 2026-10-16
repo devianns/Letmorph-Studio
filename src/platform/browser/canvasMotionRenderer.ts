@@ -1,5 +1,6 @@
 import { evaluateImageMotion, type MotionItem, type ImageMotionSettings } from '../../engine/evaluateImageMotion'
 import { smoothClosedPolygon } from '../../engine/smoothPolygon'
+import { getWorkspaceContentRect, WORKSPACE_SCALE } from '../../engine/workspaceLayout'
 
 const selectionPatchCache = new WeakMap<HTMLImageElement, Map<string, HTMLCanvasElement>>()
 
@@ -70,8 +71,9 @@ function drawItemAt(
   alpha = 1,
 ): void {
   const { canvas } = context
-  const width = canvas.width
-  const height = canvas.height
+  const imageRect = getWorkspaceContentRect(canvas.width, canvas.height)
+  const width = imageRect.width
+  const height = imageRect.height
   const patch = item.source ? image : getItemPatch(image, item)
   if (!patch || alpha <= 0) return
   const pose = evaluateImageMotion(timeMs, width, height, item)
@@ -88,7 +90,7 @@ function drawItemAt(
   }
   context.save()
   context.globalAlpha *= alpha
-  context.translate(pivotX * width + pose.x, pivotY * height + pose.y)
+  context.translate(imageRect.x + pivotX * width + pose.x, imageRect.y + pivotY * height + pose.y)
   context.rotate(pose.rotation)
   context.scale(pose.scale, pose.scale)
   context.drawImage(patch, -pivotX * width, -pivotY * height, width, height)
@@ -139,8 +141,8 @@ export async function startMotionPreview(
 
   const maxSide = 900
   const scale = Math.min(1, maxSide / Math.max(image.naturalWidth, image.naturalHeight))
-  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
-  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale * WORKSPACE_SCALE))
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale * WORKSPACE_SCALE))
 
   let frameId = 0
   let active = true

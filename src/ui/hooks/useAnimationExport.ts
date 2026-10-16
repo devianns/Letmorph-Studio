@@ -10,14 +10,15 @@ export function useAnimationExport() {
   const [error, setError] = useState<string>()
   const [saved, setSaved] = useState(false)
 
-  const exportAnimation = useCallback(async (sourceUrl: string, settings: ImageMotionSettings, format: 'mp4' | 'webm') => {
+  const exportAnimation = useCallback(async (sourceUrl: string, settings: ImageMotionSettings, format: 'mp4' | 'webm', repeatCount: number) => {
     setError(undefined)
     setSaved(false)
     setProgress(0)
     setIsExporting(true)
     try {
       const blob = await exportCharacterClip(sourceUrl, settings, {
-        durationMs: 2400,
+        durationMs: 2400 * Math.max(1, Math.min(25, Math.floor(repeatCount))),
+        cycleDurationMs: 2400,
         fps: 60,
         maxSide: 1920,
         format,

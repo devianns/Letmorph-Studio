@@ -44,6 +44,8 @@ The product journey and implementation gates are defined in [user-flow.md](user-
 - [x] Allow 16x canvas zoom and aspect-correct round pen markers.
 - [x] Edit existing pen boundaries by dragging their vertices with undo support.
 - [x] Improve video export resolution, frame rate, resampling, and recorder bitrate.
+- [x] Let users repeat the 2.4-second export cycle up to 25 times (60 seconds total).
+- [x] Add 25% workspace margins around source art so movement has room before it reaches the canvas edge.
 - [ ] Add per-part pivots and parent-child transforms.
 - [ ] Add mesh editing and deformation controls.
 - [ ] Add parameter controls and key pose capture.

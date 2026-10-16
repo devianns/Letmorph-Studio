@@ -32,6 +32,7 @@ export default function App() {
   const [showGuides, setShowGuides] = useState(true)
   const [boundaryEdit, setBoundaryEdit] = useState(false)
   const [videoFormat, setVideoFormat] = useState<'mp4' | 'webm'>(() => isVideoFormatSupported('webm') ? 'webm' : 'mp4')
+  const [repeatCount, setRepeatCount] = useState(1)
   const [previewError, setPreviewError] = useState<string>()
   const selectedItem = items.find(item => item.id === selectedItemId)
 
@@ -102,14 +103,14 @@ export default function App() {
     background: '#f2efe8', items,
   }), [items, selectedItem])
   const onPreviewError = useCallback((message: string) => setPreviewError(message), [])
-  const handleExport = () => { if (imageUrl) void exportAnimation(imageUrl, settings, videoFormat) }
+  const handleExport = () => { if (imageUrl) void exportAnimation(imageUrl, settings, videoFormat, repeatCount) }
   const currentError = importError ?? exportError ?? previewError
 
   return <main className="app-shell">
     <header className="topbar">
       <div className="brand"><span className="brand-mark">L</span><span>Letmorph <span className="brand-light">Studio</span></span></div>
       <div className="project-title">{project?.name ?? '새 캐릭터'} <span className="unsaved-dot" /></div>
-      <div className="top-actions"><button className="quiet-button" disabled={!imageUrl} onClick={resetProject}>처음으로</button><label className="export-format-control"><span>형식</span><select aria-label="내보내기 형식" value={videoFormat} onChange={event => setVideoFormat(event.target.value as 'mp4' | 'webm')}><option value="mp4" disabled={!isVideoFormatSupported('mp4')}>MP4{isVideoFormatSupported('mp4') ? '' : ' (지원 안 됨)'}</option><option value="webm" disabled={!isVideoFormatSupported('webm')}>WebM{isVideoFormatSupported('webm') ? '' : ' (지원 안 됨)'}</option></select></label><span className="save-state">{saved ? '영상이 저장됐어요' : '작업 중'}</span><button className="quiet-button" disabled={!imageUrl || isExporting || !isVideoFormatSupported(videoFormat)} onClick={handleExport}>영상 저장</button></div>
+      <div className="top-actions"><button className="quiet-button" disabled={!imageUrl} onClick={resetProject}>처음으로</button><label className="export-format-control"><span>형식</span><select aria-label="내보내기 형식" value={videoFormat} onChange={event => setVideoFormat(event.target.value as 'mp4' | 'webm')}><option value="mp4" disabled={!isVideoFormatSupported('mp4')}>MP4{isVideoFormatSupported('mp4') ? '' : ' (지원 안 됨)'}</option><option value="webm" disabled={!isVideoFormatSupported('webm')}>WebM{isVideoFormatSupported('webm') ? '' : ' (지원 안 됨)'}</option></select></label><label className="export-format-control repeat-count-control"><span>반복</span><input aria-label="영상 반복 횟수 (최대 25회)" type="number" min="1" max="25" step="1" value={repeatCount} onChange={event => setRepeatCount(Math.max(1, Math.min(25, Number(event.target.value) || 1)))} /><small>{(repeatCount * 2.4).toFixed(1)}초</small></label><span className="save-state">{saved ? '영상이 저장됐어요' : '작업 중'}</span><button className="quiet-button" disabled={!imageUrl || isExporting || !isVideoFormatSupported(videoFormat)} onClick={handleExport}>영상 저장</button></div>
     </header>
     <nav className="workflow" aria-label="만들기 단계">{steps.map((step, index) => <div className={`workflow-step ${index === (imageUrl ? 1 : 0) ? 'active' : ''}`} key={step}><span className="step-number">0{index + 1}</span>{step}{index < steps.length - 1 && <span className="step-arrow">›</span>}</div>)}</nav>
     <section className="workspace">

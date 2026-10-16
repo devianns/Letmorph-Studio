@@ -1,8 +1,10 @@
 import type { ImageMotionSettings } from '../../engine/evaluateImageMotion'
 import { renderMotionFrame } from './canvasMotionRenderer'
+import { WORKSPACE_SCALE } from '../../engine/workspaceLayout'
 
 export interface VideoOptions {
   durationMs: number
+  cycleDurationMs: number
   fps: number
   maxSide: number
   format: 'mp4' | 'webm'
@@ -32,8 +34,8 @@ export async function recordVideo(
 
   const scale = Math.min(1, options.maxSide / Math.max(image.naturalWidth, image.naturalHeight))
   const canvas = document.createElement('canvas')
-  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale))
-  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale))
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale * WORKSPACE_SCALE))
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale * WORKSPACE_SCALE))
   const context = canvas.getContext('2d')
   if (!context) throw new Error('Canvas 2D rendering is unavailable.')
   context.imageSmoothingEnabled = true
@@ -80,7 +82,7 @@ export async function recordVideo(
     let animationFrame = 0
     const draw = (now: number) => {
       const elapsed = Math.min(options.durationMs, now - startedAt)
-      renderMotionFrame(context, image, elapsed, settings)
+      renderMotionFrame(context, image, elapsed % options.cycleDurationMs, settings)
       onProgress(Math.round((elapsed / options.durationMs) * 100))
       if (elapsed >= options.durationMs) {
         cancelAnimationFrame(animationFrame)

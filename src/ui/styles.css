@@ -11,3 +11,7 @@
 .export-format-control{display:flex;align-items:center;gap:5px;color:#858691;font-size:9px}.export-format-control select{border:1px solid #383943;border-radius:5px;background:#20212a;color:#d7d6df;padding:6px 7px;font:9px inherit}.export-format-control option{background:#20212a;color:#d7d6df}
 
 .preview-board .selection-overlay.boundary-edit{pointer-events:auto;cursor:default}.boundary-vertex{fill:#b6f278;stroke:#182014;stroke-width:.45;vector-effect:non-scaling-stroke;pointer-events:all;cursor:grab}.boundary-vertex:active{fill:#efffd8;cursor:grabbing}
+
+.repeat-count-control input{width:42px;border:1px solid #383943;border-radius:5px;background:#20212a;color:#e5e4eb;padding:5px 3px;text-align:center;font:9px 'DM Mono',monospace}.repeat-count-control small{color:#9a9ba5;font-size:8px;white-space:nowrap}
+
+.preview-board .selection-overlay{left:16.6667%;top:16.6667%;width:66.6667%;height:66.6667%}
