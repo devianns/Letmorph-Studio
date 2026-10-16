@@ -154,7 +154,7 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, settings, pl
         }}
         onPointerMove={event => { if (tool === 'pen' && draft.current.length) setCursor(pointFromEvent(event)) }}
         onKeyDown={handleKeyDown}>
-        {items.map(item => <path key={item.id} d={item.points?.length ? normalizedPolygonPath(smoothClosedPolygon(item.points, item.edgeSmoothing ?? 0)) : fullImagePath} className={`item-outline ${selectedItemId === item.id ? 'active' : ''} ${item.visible ? '' : 'hidden'}`} />)}
+        {items.filter(item => !item.empty).map(item => <path key={item.id} d={item.points?.length ? normalizedPolygonPath(smoothClosedPolygon(item.points, item.edgeSmoothing ?? 0)) : fullImagePath} className={`item-outline ${selectedItemId === item.id ? 'active' : ''} ${item.visible ? '' : 'hidden'}`} />)}
         {boundaryEdit && selectedItemId && items.find(item => item.id === selectedItemId)?.points?.map((point, index) => <ellipse key={`${selectedItemId}-vertex-${index}`} cx={point.x * 100} cy={point.y * 100} rx={2.2 * 100 / Math.max(1, boardWidth)} ry={2.2 * 100 / Math.max(1, boardHeight)} className="boundary-vertex" onPointerDown={event => {
           if (event.button !== 0) return
           event.preventDefault()

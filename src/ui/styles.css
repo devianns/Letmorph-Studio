@@ -21,3 +21,5 @@
 .morph-select{display:block;width:100%;margin-top:8px;padding:7px;border:1px solid #383943;border-radius:5px;background:#20212a;color:#e9e8ee;font-size:9px}
 
 .pen-point,.close-point,.boundary-vertex{fill:#82d957;stroke:#173019;stroke-width:.3;vector-effect:non-scaling-stroke}.pen-point{opacity:.95}.close-point{stroke-width:.45}.boundary-vertex{pointer-events:all;cursor:grab}.guide-toggle kbd{margin-left:4px;padding:1px 4px;border:1px solid #4b4d55;border-radius:3px;color:#d8d7de;font:8px 'DM Mono',monospace}
+
+.tool-button:disabled{opacity:.42;cursor:not-allowed}.add-layer-action{width:100%;margin:8px 0 6px;border-color:#6d8d4d;color:#c8e5a4}

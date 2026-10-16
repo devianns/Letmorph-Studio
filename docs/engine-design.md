@@ -164,3 +164,6 @@ Item sizing is a separate 0.5?2.0 multiplier applied after the motion pose, and 
 
 
 Video export uses the same unwrapped elapsed-time timeline as live preview. It must not reset time at the nominal 2.4-second base interval: per-item speed and preset harmonics can have non-integer periods there, which creates an export-only discontinuity. Each triangle draws the complete source under its mesh clip; cropping to triangle bounds caused interpolation gaps along adjacent mesh edges.
+
+
+Manually created motion items can have empty: true before any content region is assigned. Empty items remain in project data and portable archives but are skipped by the renderer and mask cache. Closing a pen selection assigns its normalized polygon to the active non-source item and clears the empty state; drawing never creates an item implicitly.

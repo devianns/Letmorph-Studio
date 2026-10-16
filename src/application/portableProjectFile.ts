@@ -25,6 +25,8 @@ function isMotionItem(value: unknown): value is MotionItem {
   if (typeof item.id !== 'string' || typeof item.name !== 'string' || typeof item.visible !== 'boolean') return false
   if (!allowedPresets.includes(String(item.preset)) || !isFiniteNumber(item.amount) || !isFiniteNumber(item.speed)) return false
   if (item.source !== undefined && typeof item.source !== 'boolean') return false
+  if (item.empty !== undefined && typeof item.empty !== 'boolean') return false
+  if (item.source === true && item.empty === true) return false
   if (item.morphMode !== undefined && !allowedMorphModes.includes(String(item.morphMode))) return false
   for (const [key, min, max] of [['morphAmount', 0, 100], ['morphAngle', 0, 360], ['morphFrequency', 1, 8], ['morphWidthBias', -100, 100], ['sizeMultiplier', 0.5, 2]] as const) {
     if (item[key] !== undefined && (!isFiniteNumber(item[key]) || item[key] < min || item[key] > max)) return false

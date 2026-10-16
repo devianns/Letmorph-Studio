@@ -24,6 +24,8 @@ export interface MotionItem extends MotionTuning {
   points?: Array<{ x: number; y: number }>
   /** The input image itself is the bottom/source layer; other whole-image items are copies above it. */
   source?: boolean
+  /** Empty manually created layer; it has no image content until a region is drawn. */
+  empty?: boolean
   preset: ImageMotionPreset
   amount: number
   speed: number

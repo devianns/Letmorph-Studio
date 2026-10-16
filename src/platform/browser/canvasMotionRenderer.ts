@@ -171,7 +171,7 @@ export function renderMotionFrame(
   const items = settings.items ?? []
   const imageRect = getWorkspaceContentRect(canvas.width, canvas.height)
   const activeMasks = new Set(items
-    .filter(item => item.visible && !item.source && (!item.points || item.points.length >= 3))
+    .filter(item => item.visible && !item.source && !item.empty && (!item.points || item.points.length >= 3))
     .map(item => getItemPatchKey(item, Math.max(1, Math.round(imageRect.width)), Math.max(1, Math.round(imageRect.height)))))
   const cache = selectionPatchCache.get(image)
   if (cache) {
@@ -179,7 +179,7 @@ export function renderMotionFrame(
   }
 
   for (const item of items) {
-    if (!item.visible || (!item.source && item.points && item.points.length < 3)) continue
+    if (!item.visible || item.empty || (!item.source && item.points && item.points.length < 3)) continue
     try {
       drawItemWithTrail(context, image, item, timeMs)
     } catch (cause) {

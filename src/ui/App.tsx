@@ -109,20 +109,40 @@ export default function App() {
     setHistory([]); setTool('select'); setEditTargetId(undefined)
   }, [project?.id, projectRestoreRevision])
 
-  const addItem = (points?: Array<{ x: number; y: number }>) => {
+  const addEmptyItem = () => {
     const number = items.filter(item => !item.source).length + 1
     const item: MotionItem = {
-      id: crypto.randomUUID(), name: points ? `영역 ${number}` : '전체 선택', points, source: false,
+      id: crypto.randomUUID(), name: `아이템 ${number}`, source: false, empty: true,
       preset: 'sway', amount: 65, speed: 1, horizontal: 100, vertical: 100, rotation: 100, scale: 100,
-      edgeSmoothing: points ? 15 : 0, edgeFeather: points ? 0.5 : 0, trailCount: 0, visible: true,
+      edgeSmoothing: 15, edgeFeather: 0.5, trailCount: 0, visible: true,
     }
     commitItems([...items, item])
     setSelectedItemId(item.id)
+    setEditTargetId(undefined)
+    setTool('pen')
+  }
+  const applyWholeSelection = () => {
+    if (!selectedItem || selectedItem.source) return
+    updateSelected({ points: undefined, empty: false })
+    setEditTargetId(undefined)
     setTool('select')
   }
   const updateSelected = (update: Partial<MotionItem>) => {
     if (!selectedItem) return
     commitItems(items.map(item => item.id === selectedItem.id ? { ...item, ...update } : item))
+  }
+  const applyDrawnRegion = (points: Array<{ x: number; y: number }>) => {
+    const targetId = editTargetId ?? selectedItemId
+    const target = items.find(item => item.id === targetId)
+    if (!target || target.source) return
+    commitItems(items.map(item => item.id === target.id ? {
+      ...item, points, empty: false,
+      edgeSmoothing: item.edgeSmoothing ?? 15,
+      edgeFeather: item.edgeFeather ?? 0.5,
+    } : item))
+    setSelectedItemId(target.id)
+    setEditTargetId(undefined)
+    setTool('select')
   }
   const deleteItem = (id: string) => {
     commitItems(items.filter(item => item.id !== id))
@@ -205,17 +225,19 @@ export default function App() {
           <div className="section-label motion-label">도구</div>
           <div className="tool-list" role="toolbar" aria-label="편집 도구">
             <button className={`tool-button ${tool === 'select' ? 'selected' : ''}`} onClick={() => setTool('select')}><b>↖</b><span>선택</span></button>
-            <button className={`tool-button ${tool === 'pen' && !editTargetId ? 'selected' : ''}`} onClick={() => { setEditTargetId(undefined); setTool('pen') }}><b>✎</b><span>펜 그리기</span></button>
-            <button className="tool-button" onClick={() => addItem()}><b>▣</b><span>전체 선택</span></button>
+            <button className="tool-button" disabled={!selectedItem || selectedItem.source} title="빈 아이템을 추가하고 선택한 뒤 그릴 수 있어요" onClick={() => { setEditTargetId(undefined); setTool('pen') }}><b>✎</b><span>선택 아이템 그리기</span></button>
+            <button className="tool-button" disabled={!selectedItem || selectedItem.source} onClick={applyWholeSelection}><b>▣</b><span>전체 영역 적용</span></button>
+            <button className="tool-button add-layer-button" onClick={addEmptyItem}><b>＋</b><span>아이템 추가</span></button>
           </div>
           {!items.some(item => item.source) && <button className="selection-button restore-base" onClick={restoreBaseItem}>기본 이미지 레이어 복구</button>}
-          {tool === 'pen' && <p className="selection-hint">캔버스를 눌러 점을 찍으세요. 시작점을 다시 누르거나 Enter를 누르면 닫혀요. Backspace는 점 하나 취소, Esc는 그리기 취소예요.</p>}
+          {tool === 'pen' && <p className="selection-hint">{selectedItem?.source ? '기본 이미지에는 영역을 그릴 수 없어요. + 아이템을 추가해 선택하세요.' : `현재 아이템 “${selectedItem?.name ?? '없음'}”에 영역을 그립니다. 점을 3개 이상 찍고 시작점을 다시 누르거나 Enter를 누르면 적용돼요. Backspace는 점 하나 취소, Esc는 그리기 취소예요.`}</p>}
           <div className="section-label motion-label">아이템 목록 <span className="item-count">{items.length}</span></div>
+          <button className="selection-button add-layer-action" onClick={addEmptyItem}>＋ 빈 아이템 추가</button>
           <div className="item-list">{items.length ? items.map((item, index) => <div className={`item-row ${selectedItemId === item.id ? 'selected' : ''}`} key={item.id}>
-            <button className="item-select" onClick={() => { setSelectedItemId(item.id); setTool('select') }}><span className="item-order">{String(index + 1).padStart(2, '0')}</span><span className="item-name">{item.name}</span><small>{item.source ? '기본 이미지 레이어' : item.points ? '펜 선택 영역' : '전체 선택 복사본'}</small></button>
+            <button className="item-select" onClick={() => { setSelectedItemId(item.id); setEditTargetId(undefined); setTool(item.empty ? 'pen' : 'select') }}><span className="item-order">{String(index + 1).padStart(2, '0')}</span><span className="item-name">{item.name}</span><small>{item.source ? '기본 이미지 레이어' : item.empty ? '빈 레이어 · 그릴 영역 없음' : item.points ? '펜 선택 영역' : '전체 선택 복사본'}</small></button>
             <button className="item-visibility" title={item.visible ? '숨기기' : '보이기'} onClick={() => commitItems(items.map(value => value.id === item.id ? { ...value, visible: !value.visible } : value))}>{item.visible ? '◉' : '○'}</button>
             <button className="item-delete" aria-label={`${item.name} 삭제`} onClick={() => deleteItem(item.id)}>×</button>
-          </div>) : <p className="empty-list">아직 아이템이 없어요.<br />펜으로 영역을 그리거나 전체 이미지를 선택하세요.</p>}</div>
+          </div>) : <p className="empty-list">아직 아이템이 없어요.<br />빈 아이템을 추가해 영역을 그려보세요.</p>}</div>
           <div className="history-actions"><button className="selection-button" disabled={!history.length} onClick={undo}>↶ 실행 취소 <kbd>Ctrl Z</kbd></button><button className="selection-button" disabled={!items.length} onClick={() => { commitItems([]); setSelectedItemId(undefined) }}>아이템 모두 지우기</button></div>
           {currentError && <p className="input-error" role="alert">{currentError}</p>}
           <div className="panel-bottom"><div className="progress-label"><span>{isExporting ? '영상 만드는 중' : imageUrl ? '저장 준비 완료' : '만들기 진행'}</span><span>{isExporting ? `${progress}%` : imageUrl ? '3 / 4' : '0 / 4'}</span></div><div className="progress-track"><div className={imageUrl ? 'progress-fill complete' : 'progress-fill'} style={isExporting ? { width: `${progress}%` } : undefined} /></div><button className="primary-button" disabled={!imageUrl || isExporting} onClick={handleExport}>{isExporting ? '영상을 만들고 있어요…' : '움직이는 영상 저장'} <span>{isExporting ? `${progress}%` : '→'}</span></button><div className="local-note">◉ 그림은 이 기기에서 처리돼요</div></div>
@@ -224,7 +246,7 @@ export default function App() {
       <section className="canvas-area" aria-label="움직임 미리보기">
         <div className="canvas-toolbar"><div className="canvas-label"><span className="live-indicator" /> 미리보기 <span className="canvas-divider">/</span> {project?.name ?? '새 캐릭터'}</div><div className="canvas-tools"><button onClick={() => setPlaying(value => !value)} title="재생/멈춤 토글 (숫자키 1)">{playing ? 'Ⅱ' : '▶'} <kbd>1</kbd></button><span>{playing ? '재생 중' : '멈춤'}</span><button className={`guide-toggle ${showGuides ? 'active' : ''}`} aria-pressed={showGuides} onClick={() => setShowGuides(value => !value)} title="가이드 토글 (숫자키 2)">{showGuides ? '가이드 숨기기' : '가이드 보기'} <kbd>2</kbd></button><span className="toolbar-divider" /><span>{tool === 'pen' ? '펜 모드' : items.length ? `${items.length}개 아이템` : '정적 원본'}</span></div></div>
         <div className={`canvas-stage ${imageUrl ? 'has-image' : ''}`}>
-          {imageUrl && project ? <CanvasPreview sourceUrl={imageUrl} imageWidth={project.canvas.width} imageHeight={project.canvas.height} settings={settings} playing={playing} onError={onPreviewError} items={items} selectedItemId={selectedItemId} tool={tool} showGuides={showGuides} boundaryEdit={boundaryEdit && tool === 'select'} onBeginBoundaryEdit={rememberItems} onUpdatePoints={(id, points) => setItems(current => current.map(item => item.id === id ? { ...item, points } : item))} onClosePath={points => { const target = items.find(item => item.id === editTargetId); if (target) { commitItems(items.map(item => item.id === target.id ? { ...item, points } : item)); setEditTargetId(undefined); setTool('select') } else addItem(points) }} /> : <div className="empty-state"><div className="empty-illustration"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="empty-spark">✦</div><div className="empty-frame"><span>✧</span></div><div className="float-dot dot-one"/><div className="float-dot dot-two"/></div><h2>캐릭터에 첫 움직임을 넣어보세요</h2><p>그림을 추가하면 바로 미리 볼 수 있어요.</p><button className="outline-button" onClick={() => inputRef.current?.click()}>그림 가져오기 <span>↗</span></button></div>}
+          {imageUrl && project ? <CanvasPreview sourceUrl={imageUrl} imageWidth={project.canvas.width} imageHeight={project.canvas.height} settings={settings} playing={playing} onError={onPreviewError} items={items} selectedItemId={selectedItemId} tool={tool} showGuides={showGuides} boundaryEdit={boundaryEdit && tool === 'select'} onBeginBoundaryEdit={rememberItems} onUpdatePoints={(id, points) => setItems(current => current.map(item => item.id === id ? { ...item, points } : item))} onClosePath={applyDrawnRegion} /> : <div className="empty-state"><div className="empty-illustration"><div className="orbit orbit-one"/><div className="orbit orbit-two"/><div className="empty-spark">✦</div><div className="empty-frame"><span>✧</span></div><div className="float-dot dot-one"/><div className="float-dot dot-two"/></div><h2>캐릭터에 첫 움직임을 넣어보세요</h2><p>그림을 추가하면 바로 미리 볼 수 있어요.</p><button className="outline-button" onClick={() => inputRef.current?.click()}>그림 가져오기 <span>↗</span></button></div>}
           {showGuides && <div className="canvas-coordinate">CANVAS <span>{project ? `${project.canvas.width} × ${project.canvas.height}` : '— × —'}</span></div>}
         </div>
         <div className="canvas-footer"><span>{selectedItem ? `${selectedItem.name} · ${motionOptions.find(option => option.id === selectedItem.preset)?.name}` : '움직임 아이템 없음'}</span><span>{selectedItem?.source ? '기본 이미지 레이어에 효과 적용 중' : '추가 아이템은 기본 이미지 위에서 움직입니다'}</span></div>
@@ -232,6 +254,7 @@ export default function App() {
       <aside className="right-panel"><div className="right-heading"><span className="eyebrow">아이템 속성</span><h2>{selectedItem?.name ?? '아이템을 선택하세요'}</h2></div>
         {selectedItem ? <div className="item-properties">
           <label className="property-name">이름<input value={selectedItem.name} onFocus={rememberItems} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, name: event.target.value } : item))} /></label>
+          {selectedItem.empty && <p className="selection-hint">아직 그려진 영역이 없는 빈 아이템입니다. 펜으로 영역을 닫으면 이 아이템에 저장됩니다.</p>}
           <div className="section-label motion-label">움직임</div><div className="motion-options" role="radiogroup" aria-label="움직임 선택">{motionOptions.map(option => <button key={option.id} className={`motion-option ${selectedItem.preset === option.id ? 'selected' : ''}`} role="radio" aria-checked={selectedItem.preset === option.id} onClick={() => updateSelected({ preset: option.id })}><span className={`motion-symbol ${option.id}`}>{option.id === 'sway' ? '↝' : option.id === 'bounce' ? '↟' : '↶'}</span><span><strong>{option.name}</strong><small>{option.description}</small></span></button>)}</div>
           <label className="range-control"><span>움직임 크기 <b>{selectedItem.amount}%</b></span><input type="range" min="0" max="100" value={selectedItem.amount} onPointerDown={rememberItems} onKeyDown={event => { if (event.key.startsWith('Arrow')) rememberItems() }} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, amount: Number(event.target.value) } : item))} /></label>
           <label className="range-control"><span>아이템 크기 <b>{(selectedItem.sizeMultiplier ?? 1).toFixed(2)}×</b></span><input aria-label="선택 아이템 크기" type="range" min="0.5" max="2" step="0.05" value={selectedItem.sizeMultiplier ?? 1} onPointerDown={rememberItems} onKeyDown={event => { if (event.key.startsWith('Arrow')) rememberItems() }} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, sizeMultiplier: Number(event.target.value) } : item))} /></label>

@@ -81,3 +81,6 @@ The product journey and implementation gates are defined in [user-flow.md](user-
 
 
 - [x] 익스포트에서 기본 모션과 공간 모핑의 시간축을 연속으로 유지하고, 2.4초마다 발생하던 위상 리셋 점프 수정
+
+
+- [x] 수동 레이어 생성과 활성 레이어 펜 편집: 빈 아이템 저장/복원, 그리기 시 자동 아이템 생성 제거
