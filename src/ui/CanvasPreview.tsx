@@ -60,7 +60,9 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, settings, pl
     let stop: (() => void) | undefined
     const canvas = canvasRef.current
     if (!canvas) return
-    void startMotionPreview(canvas, sourceUrl, () => previewState.current.settings, () => previewState.current.playing)
+    void startMotionPreview(canvas, sourceUrl, () => previewState.current.settings, () => previewState.current.playing, item => {
+      onError(`'${item.name}' 아이템을 그리는 중 문제가 발생했어요. 해당 아이템의 영역과 효과 설정을 확인해 주세요.`)
+    })
       .then(stopPreview => { if (cancelled) stopPreview(); else stop = stopPreview })
       .catch(() => onError('미리보기를 시작하지 못했어요. 다른 이미지로 다시 시도해 주세요.'))
     return () => { cancelled = true; stop?.() }

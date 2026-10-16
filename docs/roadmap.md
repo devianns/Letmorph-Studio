@@ -16,7 +16,7 @@ The product journey and implementation gates are defined in [user-flow.md](user-
 ## Milestone 1: Import and editable project
 
 - [x] Import PNG/JPEG/WebP, validate/decode it in TypeScript modules, create in-memory project metadata, and preview it.
-- [ ] Define versioned project schema and save/open project archive.
+- [x] Define a versioned `.letmorph` project file with embedded source image and save/open support.
 - [ ] Keep source image immutable and create derived assets separately.
 - [ ] Write plain-language guided steps and first-run defaults for creating a first moving character.
 
@@ -44,6 +44,8 @@ The product journey and implementation gates are defined in [user-flow.md](user-
 - [x] Allow 16x canvas zoom and aspect-correct round pen markers.
 - [x] Edit existing pen boundaries by dragging their vertices with undo support.
 - [x] Improve video export resolution, frame rate, resampling, and recorder bitrate.
+- [x] Keep derived item-mask caches at render resolution and discard cache entries unused by current items.
+- [x] Isolate item rendering failures so one invalid item cannot stop the preview loop; fail video export with the affected item name.
 - [x] Let users repeat the 2.4-second export cycle up to 25 times (60 seconds total).
 - [x] Add 25% workspace margins around source art so movement has room before it reaches the canvas edge.
 - [ ] Add per-part pivots and parent-child transforms.

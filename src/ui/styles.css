@@ -15,3 +15,5 @@
 .repeat-count-control input{width:42px;border:1px solid #383943;border-radius:5px;background:#20212a;color:#e5e4eb;padding:5px 3px;text-align:center;font:9px 'DM Mono',monospace}.repeat-count-control small{color:#9a9ba5;font-size:8px;white-space:nowrap}
 
 .preview-board .selection-overlay{left:16.6667%;top:16.6667%;width:66.6667%;height:66.6667%}
+
+.project-file-actions{display:flex;gap:6px;margin-top:8px}.project-file-actions .selection-button{font-size:8px;padding:7px 4px}.project-file-actions .selection-button:disabled{opacity:.4}

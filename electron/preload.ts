@@ -5,4 +5,8 @@ contextBridge.exposeInMainWorld('desktop', {
   platform: process.platform,
   saveAnimation: (bytes: Uint8Array, suggestedName: string, extension: 'mp4' | 'webm') =>
     ipcRenderer.invoke('animation:save', { bytes, suggestedName, extension }) as Promise<{ cancelled: boolean }>,
+  saveProject: (bytes: Uint8Array, suggestedName: string) =>
+    ipcRenderer.invoke('project:save', { bytes, suggestedName }) as Promise<{ cancelled: boolean }>,
+  openProject: () =>
+    ipcRenderer.invoke('project:open') as Promise<{ cancelled: boolean; bytes?: Uint8Array }>,
 })

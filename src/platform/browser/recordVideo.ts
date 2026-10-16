@@ -1,4 +1,4 @@
-import type { ImageMotionSettings } from '../../engine/evaluateImageMotion'
+import type { ImageMotionSettings, MotionItem } from '../../engine/evaluateImageMotion'
 import { renderMotionFrame } from './canvasMotionRenderer'
 import { WORKSPACE_SCALE } from '../../engine/workspaceLayout'
 
@@ -61,6 +61,7 @@ export async function recordVideo(
   const chunks: BlobPart[] = []
 
   return new Promise((resolve, reject) => {
+    let renderFailure: MotionItem | undefined
     recorder.addEventListener('dataavailable', event => {
       if (event.data.size > 0) chunks.push(event.data)
     })
@@ -71,6 +72,10 @@ export async function recordVideo(
     recorder.addEventListener('stop', () => {
       stream.getTracks().forEach(track => track.stop())
       image.src = ''
+      if (renderFailure) {
+        reject(new Error(`'${renderFailure.name}' 아이템을 영상에 그리지 못했습니다. 해당 아이템의 영역과 효과 설정을 확인해 주세요.`))
+        return
+      }
       // Keep the requested container explicit. Some Chromium builds report an
       // empty recorder.mimeType after recording even though they accepted the
       // requested type at construction time.
@@ -82,7 +87,14 @@ export async function recordVideo(
     let animationFrame = 0
     const draw = (now: number) => {
       const elapsed = Math.min(options.durationMs, now - startedAt)
-      renderMotionFrame(context, image, elapsed % options.cycleDurationMs, settings)
+      renderMotionFrame(context, image, elapsed % options.cycleDurationMs, settings, item => {
+        renderFailure ??= item
+      })
+      if (renderFailure) {
+        cancelAnimationFrame(animationFrame)
+        recorder.stop()
+        return
+      }
       onProgress(Math.round((elapsed / options.durationMs) * 100))
       if (elapsed >= options.durationMs) {
         cancelAnimationFrame(animationFrame)

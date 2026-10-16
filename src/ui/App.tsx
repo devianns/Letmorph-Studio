@@ -4,6 +4,8 @@ import { useAnimationExport } from './hooks/useAnimationExport'
 import { useCharacterProject } from './hooks/useCharacterProject'
 import type { ImageMotionPreset, ImageMotionSettings, MotionItem } from '../engine/evaluateImageMotion'
 import { isVideoFormatSupported } from '../platform/browser/recordVideo'
+import { createPortableProjectFile, parsePortableProjectFile, type PortableProjectFile } from '../application/portableProjectFile'
+import { downloadBlob } from '../platform/browser/downloadFile'
 
 type EditorTool = 'select' | 'pen'
 const steps = ['그림 가져오기', '아이템 만들기', '움직임 조절', '영상 저장']
@@ -19,8 +21,19 @@ const motionOptions: { id: ImageMotionPreset; name: string; description: string 
   { id: 'shake', name: '파르르', description: '작고 빠르게 떨려요' },
 ]
 
+function blobAsDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('원본 이미지를 작업 파일에 담지 못했습니다.'))
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('원본 이미지 변환에 실패했습니다.'))
+    reader.readAsDataURL(blob)
+  })
+}
+
 export default function App() {
   const inputRef = useRef<HTMLInputElement>(null)
+  const projectInputRef = useRef<HTMLInputElement>(null)
+  const pendingProjectRestore = useRef<PortableProjectFile | undefined>(undefined)
   const { project, imageUrl, error: importError, isLoading, importImage, clearProject } = useCharacterProject()
   const { isExporting, progress, error: exportError, saved, exportAnimation } = useAnimationExport()
   const [items, setItems] = useState<MotionItem[]>([])
@@ -34,6 +47,8 @@ export default function App() {
   const [videoFormat, setVideoFormat] = useState<'mp4' | 'webm'>(() => isVideoFormatSupported('webm') ? 'webm' : 'mp4')
   const [repeatCount, setRepeatCount] = useState(1)
   const [previewError, setPreviewError] = useState<string>()
+  const [projectFileError, setProjectFileError] = useState<string>()
+  const [projectRestoreRevision, setProjectRestoreRevision] = useState(0)
   const selectedItem = items.find(item => item.id === selectedItemId)
 
   const commitItems = useCallback((next: MotionItem[]) => {
@@ -62,13 +77,26 @@ export default function App() {
   }, [undo])
   useEffect(() => {
     if (project) {
+      const restored = pendingProjectRestore.current
+      if (restored?.project.id === project.id) {
+        setItems(restored.items)
+        setSelectedItemId(restored.selectedItemId && restored.items.some(item => item.id === restored.selectedItemId)
+          ? restored.selectedItemId
+          : restored.items[0]?.id)
+        setVideoFormat(restored.exportSettings.format)
+        setRepeatCount(restored.exportSettings.repeatCount)
+        pendingProjectRestore.current = undefined
+        setHistory([]); setTool('select'); setEditTargetId(undefined)
+        return
+      }
+      pendingProjectRestore.current = undefined
       const baseItem: MotionItem = { id: `${project.id}:source`, name: '기본 이미지', source: true, preset: 'sway', amount: 45, speed: 1, horizontal: 100, vertical: 100, rotation: 100, scale: 100, visible: true }
       setItems([baseItem]); setSelectedItemId(baseItem.id)
     } else {
       setItems([]); setSelectedItemId(undefined)
     }
     setHistory([]); setTool('select'); setEditTargetId(undefined)
-  }, [project?.id])
+  }, [project?.id, projectRestoreRevision])
 
   const addItem = (points?: Array<{ x: number; y: number }>) => {
     const number = items.filter(item => !item.source).length + 1
@@ -96,7 +124,43 @@ export default function App() {
     setSelectedItemId(baseItem.id)
   }
   const resetProject = () => {
+    pendingProjectRestore.current = undefined
     clearProject(); setItems([]); setHistory([]); setSelectedItemId(undefined); setTool('select'); setEditTargetId(undefined)
+  }
+  const exportProjectFile = async () => {
+    if (!project || !imageUrl) return
+    try {
+      const sourceBlob = await fetch(imageUrl).then(response => response.blob())
+      const archive = createPortableProjectFile(project, await blobAsDataUrl(sourceBlob), items, selectedItemId, { format: videoFormat, repeatCount })
+      const bytes = new TextEncoder().encode(JSON.stringify(archive))
+      const fileName = `${project.name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')}.letmorph`
+      if (window.desktop) {
+        await window.desktop.saveProject(bytes, fileName)
+      } else {
+        downloadBlob(new Blob([bytes], { type: 'application/vnd.letmorph.project+json' }), fileName)
+      }
+      setProjectFileError(undefined)
+    } catch (cause) {
+      setProjectFileError(cause instanceof Error ? cause.message : '작업 파일 내보내기에 실패했습니다.')
+    }
+  }
+  const importProjectFile = async (file?: File) => {
+    if (!file) return
+    try {
+      if (file.size > 100 * 1024 * 1024) throw new Error('작업 파일은 100MB 이하여야 합니다.')
+      const { archive, sourceImage } = parsePortableProjectFile(await file.text())
+      pendingProjectRestore.current = archive
+      const loadedProject = await importImage(sourceImage, archive.project)
+      if (!loadedProject) {
+        pendingProjectRestore.current = undefined
+        throw new Error('작업 파일의 원본 이미지를 불러오지 못했습니다.')
+      }
+      setProjectFileError(undefined)
+      if (project?.id === archive.project.id) setProjectRestoreRevision(value => value + 1)
+    } catch (cause) {
+      pendingProjectRestore.current = undefined
+      setProjectFileError(cause instanceof Error ? cause.message : '작업 파일을 가져오지 못했습니다.')
+    }
   }
   const settings = useMemo<ImageMotionSettings>(() => ({
     preset: selectedItem?.preset ?? 'sway', amount: selectedItem?.amount ?? 65, speed: selectedItem?.speed ?? 1,
@@ -104,7 +168,7 @@ export default function App() {
   }), [items, selectedItem])
   const onPreviewError = useCallback((message: string) => setPreviewError(message), [])
   const handleExport = () => { if (imageUrl) void exportAnimation(imageUrl, settings, videoFormat, repeatCount) }
-  const currentError = importError ?? exportError ?? previewError
+  const currentError = importError ?? exportError ?? projectFileError ?? previewError
 
   return <main className="app-shell">
     <header className="topbar">
@@ -120,6 +184,12 @@ export default function App() {
         <div className="section-label">캐릭터 그림</div>
         {project ? <div className="file-card"><div className="file-icon">▧</div><div className="file-meta"><strong title={project.sourceImage.fileName}>{project.sourceImage.fileName}</strong><span>{project.sourceImage.width} × {project.sourceImage.height}</span></div><button className="more-button" onClick={() => inputRef.current?.click()}>변경</button></div> : <button className="drop-card" onClick={() => inputRef.current?.click()} onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); void importImage(event.dataTransfer.files[0]) }}><span className="upload-icon">{isLoading ? '…' : '↑'}</span><strong>{isLoading ? '그림을 확인하고 있어요' : '이미지를 여기에 놓으세요'}</strong><span>{isLoading ? '잠시만 기다려 주세요' : '또는 클릭하여 파일 선택'}</span><small>PNG · JPG · WEBP</small></button>}
         <input ref={inputRef} className="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" onChange={event => { void importImage(event.target.files?.[0]); event.currentTarget.value = '' }} />
+        <div className="project-file-actions"><button className="selection-button" onClick={() => window.desktop ? void window.desktop.openProject().then(result => {
+          if (result.cancelled || !result.bytes) return
+          void importProjectFile(new File([result.bytes], 'character.letmorph', { type: 'application/vnd.letmorph.project+json' }))
+        }).catch(cause => setProjectFileError(cause instanceof Error ? cause.message : '작업 파일을 열지 못했습니다.')) : projectInputRef.current?.click()}>작업 가져오기</button><button className="selection-button" disabled={!project || !imageUrl} onClick={() => void exportProjectFile()}>작업 내보내기</button></div>
+        <input ref={projectInputRef} className="visually-hidden" type="file" accept=".letmorph,application/vnd.letmorph.project+json,application/json" onChange={event => { void importProjectFile(event.target.files?.[0]); event.currentTarget.value = '' }} />
+        {projectFileError && <p className="input-error" role="alert">{projectFileError}</p>}
         {imageUrl && <>
           <div className="section-label motion-label">도구</div>
           <div className="tool-list" role="toolbar" aria-label="편집 도구">

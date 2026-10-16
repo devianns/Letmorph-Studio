@@ -24,28 +24,34 @@ export function useCharacterProject() {
     if (previewRef.current) releaseBrowserImagePreview(previewRef.current)
   }, [])
 
-  const importImage = useCallback(async (file?: File) => {
-    if (!file) return
+  const importImage = useCallback(async (file?: File, restoredProject?: CharacterProject): Promise<CharacterProject | undefined> => {
+    if (!file) return undefined
     const sequence = ++importSequence.current
     setError(undefined)
     setIsLoading(true)
 
     try {
-      const nextProject = await createCharacterProject(file, {
+      const inspectedProject = await createCharacterProject(file, {
         inspectImage: inspectBrowserImage,
         createId: () => crypto.randomUUID(),
       })
       if (sequence !== importSequence.current) return
+
+      const nextProject = restoredProject
+        ? { ...restoredProject, sourceImage: inspectedProject.sourceImage, canvas: inspectedProject.canvas }
+        : inspectedProject
 
       const nextUrl = createBrowserImagePreview(file)
       if (previewRef.current) releaseBrowserImagePreview(previewRef.current)
       previewRef.current = nextUrl
       setProject(nextProject)
       setImageUrl(nextUrl)
+      return nextProject
     } catch (cause) {
       if (sequence !== importSequence.current) return
       const code = cause instanceof ImageInputError ? cause.code : 'INVALID_IMAGE_DATA'
       setError(errorMessages[code])
+      return undefined
     } finally {
       if (sequence === importSequence.current) setIsLoading(false)
     }

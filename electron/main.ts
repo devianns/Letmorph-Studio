@@ -1,6 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain } from 'electron'
 import path from 'node:path'
-import { writeFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 
 let mainWindow: BrowserWindow | undefined
 
@@ -51,6 +51,47 @@ ipcMain.handle('animation:save', async (event, payload: unknown) => {
   await writeFile(outputPath, Buffer.from(payload.bytes))
   return { cancelled: false }
 })
+
+ipcMain.handle('project:save', async (event, payload: unknown) => {
+  if (!mainWindow || event.sender !== mainWindow.webContents || !isProjectPayload(payload)) {
+    throw new Error('Invalid project save request.')
+  }
+  if (payload.bytes.byteLength === 0 || payload.bytes.byteLength > 100 * 1024 * 1024) {
+    throw new Error('The project file size is not supported.')
+  }
+  const safeName = payload.suggestedName.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').replace(/\.letmorph$/i, '') + '.letmorph'
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Letmorph Studio 작업 내보내기',
+    defaultPath: safeName,
+    filters: [{ name: 'Letmorph Studio Project', extensions: ['letmorph'] }],
+  })
+  if (result.canceled || !result.filePath) return { cancelled: true }
+  const extension = path.extname(result.filePath)
+  const outputPath = extension
+    ? `${result.filePath.slice(0, -extension.length)}.letmorph`
+    : `${result.filePath}.letmorph`
+  await writeFile(outputPath, Buffer.from(payload.bytes))
+  return { cancelled: false }
+})
+
+ipcMain.handle('project:open', async event => {
+  if (!mainWindow || event.sender !== mainWindow.webContents) throw new Error('Invalid project open request.')
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: 'Letmorph Studio 작업 가져오기',
+    properties: ['openFile'],
+    filters: [{ name: 'Letmorph Studio Project', extensions: ['letmorph'] }],
+  })
+  if (result.canceled || !result.filePaths[0]) return { cancelled: true }
+  const bytes = await readFile(result.filePaths[0])
+  if (bytes.byteLength === 0 || bytes.byteLength > 100 * 1024 * 1024) throw new Error('The project file size is not supported.')
+  return { cancelled: false, bytes: Uint8Array.from(bytes) }
+})
+
+function isProjectPayload(value: unknown): value is { bytes: Uint8Array; suggestedName: string } {
+  if (typeof value !== 'object' || value === null) return false
+  const candidate = value as Record<string, unknown>
+  return candidate.bytes instanceof Uint8Array && typeof candidate.suggestedName === 'string'
+}
 
 function isSavePayload(value: unknown): value is { bytes: Uint8Array; suggestedName: string; extension: 'mp4' | 'webm' } {
   if (typeof value !== 'object' || value === null) return false
