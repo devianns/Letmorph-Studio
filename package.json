@@ -1,0 +1,28 @@
+{
+  "name": "letmorph-studio",
+  "version": "0.1.0",
+  "private": true,
+  "productName": "Letmorph Studio",
+  "description": "Windows-first 2D character motion studio",
+  "main": "electron-dist/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite --host 127.0.0.1\" \"tsc -p electron/tsconfig.json --watch\" \"wait-on http://127.0.0.1:5173 electron-dist/main.js && electron .\"",
+    "build": "tsc -p electron/tsconfig.json && tsc -b && vite build --configLoader runner",
+    "preview": "vite preview --host 127.0.0.1"
+  },
+  "dependencies": {
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.0.0",
+    "@types/node": "^22.15.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "concurrently": "^9.1.0",
+    "electron": "^37.2.0",
+    "typescript": "~5.8.3",
+    "vite": "^7.0.0",
+    "wait-on": "^8.0.3"
+  }
+}
