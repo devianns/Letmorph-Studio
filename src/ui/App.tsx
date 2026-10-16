@@ -59,6 +59,10 @@ export default function App() {
   const [playing, setPlaying] = useState(true)
   const [showGuides, setShowGuides] = useState(true)
   const [boundaryEdit, setBoundaryEdit] = useState(false)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    try { return localStorage.getItem('letmorph-theme') === 'light' ? 'light' : 'dark' }
+    catch { return 'dark' }
+  })
   const [videoFormat, setVideoFormat] = useState<'mp4' | 'webm'>(() => isVideoFormatSupported('webm') ? 'webm' : 'mp4')
   const [repeatCount, setRepeatCount] = useState(1)
   const [previewError, setPreviewError] = useState<string>()
@@ -71,6 +75,11 @@ export default function App() {
   latestItems.current = items
   latestProjectId.current = project?.id
   const selectedItem = items.find(item => item.id === selectedItemId)
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    try { localStorage.setItem('letmorph-theme', theme) } catch { /* Theme still works for this session. */ }
+  }, [theme])
 
   const commitItems = useCallback((next: MotionItem[]) => {
     setHistory(stack => [...stack.slice(-49), items.map(item => ({ ...item, points: item.points?.map(point => ({ ...point })) }))])
@@ -295,11 +304,11 @@ export default function App() {
   const handleExport = () => { if (imageUrl) void exportAnimation(imageUrl, settings, videoFormat, repeatCount) }
   const currentError = importError ?? exportError ?? projectFileError ?? previewError
 
-  return <main className="app-shell">
+  return <main className="app-shell" data-theme={theme}>
     <header className="topbar">
       <div className="brand"><span className="brand-mark">L</span><span>Letmorph <span className="brand-light">Studio</span></span></div>
       <div className="project-title">{project?.name ?? '새 캐릭터'} <span className="unsaved-dot" /></div>
-      <div className="top-actions"><button className="quiet-button" disabled={!imageUrl} onClick={resetProject}>처음으로</button><details className="canvas-size-menu"><summary>캔버스 {project ? `${project.canvas.width}×${project.canvas.height}` : '크기'}</summary><div className="canvas-size-fields"><label>너비<input type="number" min="64" max="32768" value={canvasDraft.width || ''} disabled={!project} onChange={event => setCanvasDraft(value => ({ ...value, width: Number(event.target.value) }))} /></label><label>높이<input type="number" min="64" max="32768" value={canvasDraft.height || ''} disabled={!project} onChange={event => setCanvasDraft(value => ({ ...value, height: Number(event.target.value) }))} /></label><button disabled={!project} onClick={applyCanvasSize}>적용</button></div></details><label className="export-format-control"><span>형식</span><select aria-label="내보내기 형식" value={videoFormat} onChange={event => setVideoFormat(event.target.value as 'mp4' | 'webm')}><option value="mp4" disabled={!isVideoFormatSupported('mp4')}>MP4{isVideoFormatSupported('mp4') ? '' : ' (지원 안 됨)'}</option><option value="webm" disabled={!isVideoFormatSupported('webm')}>WebM{isVideoFormatSupported('webm') ? '' : ' (지원 안 됨)'}</option></select></label><label className="export-format-control repeat-count-control"><span>반복</span><input aria-label="영상 반복 횟수" type="number" min="1" step="1" value={repeatCount} onChange={event => { const count = Number(event.target.value); if (Number.isSafeInteger(count) && count > 0) setRepeatCount(count) }} /><small>{formatDuration(repeatCount * 2.4)} · 약 {formatBytes(estimatedExportBytes)}</small></label><span className="save-state">{saved ? '영상이 저장됐어요' : '작업 중'}</span><button className="quiet-button" disabled={!imageUrl || isExporting || !isVideoFormatSupported(videoFormat) || estimatedExportBytes > MAX_VIDEO_EXPORT_BYTES} title={estimatedExportBytes > MAX_VIDEO_EXPORT_BYTES ? '예상 영상이 512 MB를 넘습니다. 반복 횟수를 줄이거나 캔버스 크기를 낮춰 주세요.' : undefined} onClick={handleExport}>영상 저장</button></div>
+      <div className="top-actions"><button className="quiet-button" disabled={!imageUrl} onClick={resetProject}>처음으로</button><details className="canvas-size-menu"><summary>캔버스 {project ? `${project.canvas.width}×${project.canvas.height}` : '크기'}</summary><div className="canvas-size-fields"><label>너비<input type="number" min="64" max="32768" value={canvasDraft.width || ''} disabled={!project} onChange={event => setCanvasDraft(value => ({ ...value, width: Number(event.target.value) }))} /></label><label>높이<input type="number" min="64" max="32768" value={canvasDraft.height || ''} disabled={!project} onChange={event => setCanvasDraft(value => ({ ...value, height: Number(event.target.value) }))} /></label><button disabled={!project} onClick={applyCanvasSize}>적용</button></div></details><label className="export-format-control"><span>형식</span><select aria-label="내보내기 형식" value={videoFormat} onChange={event => setVideoFormat(event.target.value as 'mp4' | 'webm')}><option value="mp4" disabled={!isVideoFormatSupported('mp4')}>MP4{isVideoFormatSupported('mp4') ? '' : ' (지원 안 됨)'}</option><option value="webm" disabled={!isVideoFormatSupported('webm')}>WebM{isVideoFormatSupported('webm') ? '' : ' (지원 안 됨)'}</option></select></label><label className="export-format-control repeat-count-control"><span>반복</span><input aria-label="영상 반복 횟수" type="number" min="1" step="1" value={repeatCount} onChange={event => { const count = Number(event.target.value); if (Number.isSafeInteger(count) && count > 0) setRepeatCount(count) }} /><small>{formatDuration(repeatCount * 2.4)} · 약 {formatBytes(estimatedExportBytes)}</small></label><span className="save-state">{saved ? '영상이 저장됐어요' : '작업 중'}</span><button className="quiet-button" disabled={!imageUrl || isExporting || !isVideoFormatSupported(videoFormat) || estimatedExportBytes > MAX_VIDEO_EXPORT_BYTES} title={estimatedExportBytes > MAX_VIDEO_EXPORT_BYTES ? '예상 영상이 512 MB를 넘습니다. 반복 횟수를 줄이거나 캔버스 크기를 낮춰 주세요.' : undefined} onClick={handleExport}>영상 저장</button><button className="theme-toggle" aria-label={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'} title={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'} onClick={() => setTheme(value => value === 'dark' ? 'light' : 'dark')}><span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span><small>{theme === 'dark' ? '라이트' : '다크'}</small></button></div>
     </header>
     <nav className="workflow" aria-label="만들기 단계">{steps.map((step, index) => <div className={`workflow-step ${index === (imageUrl ? 1 : 0) ? 'active' : ''}`} key={step}><span className="step-number">0{index + 1}</span>{step}{index < steps.length - 1 && <span className="step-arrow">›</span>}</div>)}</nav>
     <section className="workspace">
