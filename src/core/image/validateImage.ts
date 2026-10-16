@@ -12,7 +12,12 @@ export class ImageInputError extends Error {
 
 const maxImageBytes = 50 * 1024 * 1024
 
-export function validateImageInput(file: Pick<File, 'type' | 'size'>): asserts file is File & { type: SupportedImageType } {
+export interface ImageInputMetadata {
+  type: string
+  size: number
+}
+
+export function validateImageInput(file: ImageInputMetadata): asserts file is ImageInputMetadata & { type: SupportedImageType } {
   if (!supportedImageTypes.includes(file.type as SupportedImageType)) {
     throw new ImageInputError('UNSUPPORTED_TYPE')
   }

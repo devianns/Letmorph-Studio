@@ -1,10 +1,6 @@
 import type { CharacterProject, SourceImage } from '../domain/project'
+import type { ImageDimensions } from '../domain/image'
 import { validateImageInput } from '../core/image/validateImage'
-
-export interface ImageDimensions {
-  width: number
-  height: number
-}
 
 export interface CharacterProjectDependencies {
   inspectImage: (file: Blob) => Promise<ImageDimensions>
@@ -36,8 +32,5 @@ export async function createCharacterProject(
     name: file.name.replace(/\.[^.]+$/, '') || '내 캐릭터',
     sourceImage,
     canvas: { width: dimensions.width, height: dimensions.height },
-    parts: [],
-    parameters: [],
-    clips: [],
   }
 }

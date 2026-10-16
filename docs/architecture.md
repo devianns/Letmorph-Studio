@@ -18,16 +18,18 @@ React UI (`src/ui`)
 
 Application workflows (`src/application`)
   ├─ create/validate a project from an image
-  └─ validate and parse a portable project file
+  ├─ validate and prepare an image motion layer
+  └─ serialize, validate, and parse a portable project file
 
 Domain (`src/domain`)
-  ├─ CharacterProject: source metadata and canvas size
-  └─ LayerDocument: layer collection, active layer, history, pure commands
+  ├─ EditorDocument: active project, layers, history, export preferences
+  ├─ MotionItem: persisted layer and motion data
+  └─ pure editor and layer commands
 
 Motion and rendering (`src/engine`, `src/platform/browser`)
   ├─ deterministic image motion and spatial deformation
   ├─ canvas renderer shared by preview and recording
-  └─ browser image, video, and download adapters
+  └─ browser image, project/video transfer, and download adapters
 
 Electron (`electron`)
   └─ narrow preload IPC for native dialogs and completed-file writes
@@ -35,32 +37,42 @@ Electron (`electron`)
 
 React is allowed to compose screens and hold presentation-only state (tool, playback, guides, theme, form drafts, progress). Layer edits are domain transitions in `src/domain/layerDocument.ts`; the reducer is UI-framework independent. The renderer sends commands and displays the resulting document. Motion evaluation, geometry, masking, frame rendering, and project validation stay outside React components.
 
+`src/ui/App.tsx` is the editor composition root: it coordinates workflows, dispatches domain commands, and owns presentation-only state. The top bar, project/layer control rail, canvas preview, and per-item inspector are separate components in `src/ui/components/` with typed props. They present values and emit callbacks; they do not own layer state or mutate the editor document.
+
 ### Layer document
 
-`LayerDocument` is the editable layer state for the current editor session:
+`EditorDocument` is the current runtime aggregate for the editor:
 
-- `items` is the ordered list of equally editable `MotionItem` layers. The `source` flag currently identifies the bottom source-image layer for compositing; it is a rendering role, not a different editing permission.
+- `project` contains source metadata and canvas dimensions.
+- `layers` contains the ordered layer document, selected layer, and session undo history.
+- `exportSettings` contains the selected video format and repeat count.
+
+The reducer in `src/domain/editorDocument.ts` handles new project creation, project restore, canvas resizing, export preferences, layer commands, and reset. The `.letmorph` v1 adapter serializes this runtime aggregate into its existing file shape. The file format remains v1; the adapter translates legacy layer booleans to the current kind and preserves legacy archive arrays opaquely.
+
+`LayerDocument` is the nested editable layer state:
+
+- `items` is the ordered list of equally editable `MotionItem` layers. Its discriminated `kind` is `source`, `empty`, `cutout`, or `image`; commands cannot change a kind through a generic property update.
 - `selectedItemId` identifies the active target for property changes and pen drawing.
 - `history` stores bounded snapshots for Ctrl+Z. Transient slider/drag updates are grouped by UI checkpoints; layer add/remove/reorder and completed region edits create checkpoints in the domain reducer.
-- `empty` describes a manually added layer with no content yet. Pen paths modify the selected item; drawing never creates an item implicitly.
+- `empty` describes a manually added layer with no content yet. A domain `set-region` command turns it into a source-backed `cutout`; pen paths modify the selected item and drawing never creates an item implicitly.
 - Imported image layers embed their image data URL and dimensions on the item.
 
-`reduceLayerDocument` is pure and owns load, clear, select, add, update, remove, reorder, source restoration, checkpoint, and undo transitions. `createMotionItem` owns consistent defaults and `nextLayerName` owns layer naming. No canvas or React state is captured by these functions.
+`reduceLayerDocument` is pure and owns load, clear, select, add, update, set-region, remove, reorder, source restoration, checkpoint, and undo transitions. Generic property updates cannot change layer identity or kind. `createMotionItem` owns consistent defaults and `nextLayerName` owns layer naming. `mapSelectionToLayer.ts` owns pen coordinate conversion and clipping. No canvas or React state is captured by these functions.
 
 ### Project and persistence boundaries
 
 There are two current data structures with different jobs:
 
-- `CharacterProject` in `src/domain/project.ts` contains the original image metadata and editable canvas dimensions. Its `parts`, `parameters`, and `clips` fields are currently empty scaffolding and are **not** the runtime motion model.
-- `MotionItem[]` in `src/engine/evaluateImageMotion.ts` is the actual current layer and motion model used by preview and export.
+- `CharacterProject` in `src/domain/project.ts` contains the original image metadata and editable canvas dimensions. `ImageDimensions` in `src/domain/image.ts` is shared data. The old v1 `parts`, `parameters`, and `clips` archive fields are held as opaque legacy data for lossless round trips; they are not the runtime motion model.
+- `MotionItem` in `src/domain/motionItem.ts` is the actual current layer and motion model used by preview and export. `src/engine/evaluateImageMotion.ts` only evaluates that data into a pose.
 
-`PortableProjectFile` in `src/application/portableProjectFile.ts` persists both structures, the original image as a data URL, selected layer, and video export preferences. The application module serializes the document to bytes and enforces the file-size limit before parsing imported files; it validates the archive before creating a browser `File`. Electron only reads/writes bytes after native dialogs. The project file is the editable source of truth once saved. Video is a derived artifact.
+`PortableProjectFile` in `src/application/portableProjectFile.ts` is a v1 persistence adapter over `EditorDocument`. Saving reads the aggregate, includes the source image through an injected reader, and produces a complete project payload; loading validates the legacy archive, converts it to `EditorDocument`, and returns the embedded source data URL. `platform/browser/inspectImage.ts` reads browser files, materializes the source `File`, and manages image URLs. The React hook coordinates that workflow and replaces the runtime document after the source preview loads. Application parsing/serialization has no DOM or Electron dependencies. `projectFileTransfer.ts` and `videoFileTransfer.ts` encode/transfer the completed payload and choose browser downloads or narrow Electron bridge calls. The project file is the editable source of truth once saved. Video is a derived artifact.
 
-**Known model debt:** `CharacterPart`, `MotionParameter`, and `MotionClip` anticipate a future rig/timeline but are not connected to `MotionItem`, the editor, or `.letmorph` behavior. Do not add features to those types while the current runtime still uses `MotionItem`. A later schema migration should either integrate the concepts into one versioned document or remove unused scaffolding; changing the existing format requires a migration and compatibility review.
+The unused `evaluate.ts` skeletal clip evaluator and its competing runtime types were removed. Future rig or timeline work must start from the current `MotionItem` model and a deliberate persistence design rather than reviving the abandoned parallel model.
 
 ### Preview and video output
 
-`evaluateImageMotion.ts` and `evaluateSpatialMorph.ts` are deterministic TypeScript evaluators. `canvasMotionRenderer.ts` draws the source underlay, image-backed layers, masks, trails, and spatial deformation. `CanvasPreview` and `recordVideo.ts` call the same frame renderer. The renderer owns image/mask caches and rendering failures; UI owns only presentation errors.
+`evaluateImageMotion.ts` and `evaluateSpatialMorph.ts` are deterministic TypeScript evaluators over domain data. `canvasMotionRenderer.ts` draws the source underlay, image-backed layers, masks, trails, and spatial deformation. `CanvasPreview` and `recordVideo.ts` call the same frame renderer. The renderer owns image/mask caches and rendering failures; UI owns only presentation errors.
 
 MP4 uses Mediabunny and WebCodecs H.264 encoding/muxing. WebM uses Chromium `MediaRecorder`. `electron/main.ts` receives encoded bytes and writes them to a path chosen through the save dialog. No GIF, AVI, standalone PNG sequence, mesh rig, hidden-pixel repair, or Live2D model export is implemented.
 
@@ -80,11 +92,8 @@ When moving behavior, move its state ownership and rules, not just the function 
 
 ## Next architecture work
 
-1. Put image-layer decoding/size checks behind an application workflow and browser image adapter; keep the asynchronous import race guard at the UI lifecycle boundary.
-2. Make a single versioned editor document the persistence boundary, with explicit layer kinds and validation. Migrate `.letmorph` v1 instead of silently changing its shape.
-3. Move source-image blob collection and native/browser save orchestration out of `App.tsx`; keep Electron limited to bytes and dialogs.
-4. Remove or integrate the unused part/parameter/clip scaffolding after a migration path is chosen.
-5. Break `App.tsx` into presentational panels only after state ownership is stable; moving JSX alone does not fix architecture.
+1. Add a multi-version `.letmorph` migration registry when a persisted file shape actually changes. The current archive already carries `formatVersion: 1`; the new runtime layer kind is translated at the v1 adapter, so a second runtime version would currently duplicate that boundary.
+2. Add reducer and archive round-trip tests when the user requests verification work; no test suite is currently part of the requested change.
 
 ## Security and licensing
 

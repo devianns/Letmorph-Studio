@@ -21,14 +21,14 @@ PNG / JPG / WebP
 3. **Define a region:** Choose pen mode and draw a closed polygon on the selected layer, or apply motion to the whole layer. Region points are stored in normalized layer-image coordinates. The renderer copies selected pixels above the unchanged source image; this avoids destructive source editing but can show seams where the copied area moves.
 4. **Tune and arrange:** Rename, show/hide, reorder, delete, position, resize, set a motion preset and axis strengths, spatial morph, trail and mask-edge controls. Ctrl+Z restores the previous layer snapshot. Layer selection is preserved independently from the active drawing tool.
 5. **Preview:** Playback, guide visibility, zoom, pan and boundary editing affect the editor view. Preview and video export use the same canvas frame renderer.
-6. **Save output:** Export MP4 (H.264 via Mediabunny/WebCodecs) or WebM (Chromium MediaRecorder), with repeat count and 512 MB estimated/actual size protection. Save the editable project separately as `.letmorph`, including source image, layer definitions, selected layer and video preferences.
+6. **Save output:** Export MP4 (H.264 via Mediabunny/WebCodecs) or WebM (Chromium MediaRecorder), with repeat count and 512 MB estimated/actual size protection. Save the editable project separately as `.letmorph`, including source image, layer definitions, selected layer and video preferences. Runtime state is aggregated before the v1 project adapter serializes it.
 
 ### Important behavior and limits
 
 - Layers share the same edit controls. The source layer has a compositor role as the unchanged bottom artwork, but it is not locked from selection, drawing, motion, sizing, or deletion.
 - A polygon selects pixels from the selected item's own image. A missing or empty image layer cannot produce a visible cutout until it has image content.
 - Region pixels are duplicated over the original. This does not reconstruct hidden pixels or erase the original region, so large displacements can reveal overlap/double-image artifacts.
-- `CharacterProject.parts`, `parameters`, and `clips` are not used by the current screen, renderer, or project-file behavior.
+- Old v1 `parts`, `parameters`, and `clips` archive fields are retained opaquely for round-trip compatibility; the current screen and renderer use `MotionItem` layers instead.
 - GIF, AVI, transparent export, semantic part separation, hidden-pixel repair, mesh deformation, and Live2D/Cubism interchange are not current outputs.
 
 ## Intended user experience
@@ -39,10 +39,10 @@ The product should state clearly when a flattened image lacks pixels behind a mo
 
 ## Implementation sequence
 
-1. Stabilize the current editor document and layer commands as the canonical editable model.
-2. Define a versioned project-document schema that directly represents the runtime layers. Add a migration from current `.letmorph` v1 before changing persistence.
-3. Move image-layer decoding and validation out of `App.tsx` into an application workflow and browser adapter.
-4. Separate project archive serialization/validation from platform file dialogs and byte writes.
+1. Keep `EditorDocument` as the canonical runtime source for project metadata, layers/history, and export preferences. **Done:** the UI now saves and restores from this aggregate.
+2. Keep `.letmorph` v1 stable through the persistence adapter. A multi-version migration registry is required before a future persisted shape change; current runtime layer-kind changes are translated without changing the file shape.
+3. Move image-layer decoding and validation out of `App.tsx` into an application workflow and browser adapter. **Done:** `createImageMotionLayer` owns layer import policy; `inspectImage` owns browser decoding and data-URL reading.
+4. Keep project archive serialization and validation in the application boundary. **Done:** `portableProjectFile.ts` serializes the runtime document, validates the v1 archive, and returns an editor document; browser file APIs and native/browser transfer are platform adapters.
 5. Add non-destructive mask editing and undo semantics, then image repair only as an explicit user tool.
 6. Add advanced rigging/timeline concepts only when they map to a reachable workflow and the renderer can evaluate them consistently in preview and export.
 

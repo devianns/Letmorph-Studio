@@ -15,16 +15,24 @@ Status reflects behavior reachable in the current app, not the presence of an un
 - [x] MP4 H.264 via Mediabunny/WebCodecs and WebM via MediaRecorder; file-size protection and repeat count.
 - [x] Portable `.letmorph` v1 import/export with embedded source/additional images, layer state, selected layer, and video preferences.
 - [x] Pure TypeScript `LayerDocument` command reducer owns layer collection, selection, order, and bounded undo history.
+- [x] Move persisted `MotionItem` and motion setting types into `domain`; engine evaluators consume domain types rather than owning the data schema.
+- [x] Replace runtime `source`/`empty` booleans with a discriminated layer kind and a domain `set-region` transition; preserve the old booleans only in the `.letmorph` v1 adapter.
+- [x] Preserve old v1 `parts`/`parameters`/`clips` fields as opaque archive data and remove the unused parallel skeletal clip evaluator.
+- [x] Image-layer validation and layer construction live in an application workflow; browser decoding and data-URL reading live behind the browser adapter.
+- [x] Portable-project JSON serialization, schema validation, and import-size policy live in the application boundary.
+- [x] Active project, layer state/history, and video export preferences are one `EditorDocument` aggregate with pure domain transitions.
+- [x] `.letmorph` v1 reads into and writes from the runtime editor document through an adapter; the persisted format was not silently changed.
+- [x] Browser image APIs and project/video file transfer are isolated in platform adapters; React code no longer calls Electron IPC or browser file APIs directly.
+- [x] Project save composition reads the `EditorDocument` in an application workflow; App no longer manually assembles or encodes the project payload.
+- [x] Pen coordinate conversion and polygon clipping are in the engine geometry module, outside React.
+- [x] Extract the canvas preview/toolbar and item inspector into typed presentation components; editor state transitions remain in `App` and the domain reducer.
+- [x] Extract the project/layer rail and top bar into typed presentation components; file inputs are owned by the rail component and state transitions remain at the composition root/domain.
+- [x] Group slider keyboard edits into one undo checkpoint per focused control, while preserving separate checkpoints for later pointer interactions.
 - [x] Architecture and user-flow documents distinguish current behavior from future direction.
 
-## Next — stabilize the project model
+## Compatibility rule
 
-- [ ] Add explicit tests when requested for layer reducer transitions, undo grouping, and project round trips.
-- [ ] Introduce one versioned persisted editor document and migrate `.letmorph` v1; keep runtime and persistence layer identity aligned.
-- [ ] Replace optional `source`/`empty` booleans with an explicit layer-kind model as part of that migration.
-- [ ] Move additional image-layer decode/validation and project save/load coordination out of `App.tsx` into meaningful workflows and adapters.
-- [ ] Make property-editor edits group reliably into one undo checkpoint, including text input and keyboard interaction.
-- [ ] Split `App.tsx` into presentation panels after state ownership and workflows are stable.
+The structural refactor for the current feature set is complete. If a future change alters the persisted `.letmorph` shape, add a multi-version migration registry at that point. The current archive already has `formatVersion: 1`, and runtime-only model changes are translated by its adapter; a second runtime document version would duplicate the existing compatibility boundary today.
 
 ## Later — improve image editing and motion
 

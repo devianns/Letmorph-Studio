@@ -1,25 +1,34 @@
 import type { CharacterProject } from '../domain/project'
-import type { MotionItem } from '../engine/evaluateImageMotion'
+import type { MotionItem } from '../domain/motionItem'
+import type { EditorDocument } from '../domain/editorDocument'
 
 export interface PortableProjectFile {
   format: 'letmorph-studio-project'
   formatVersion: 1
-  project: CharacterProject
+  project: LegacyCharacterProject
   sourceImageDataUrl: string
-  items: MotionItem[]
+  items: LegacyMotionItem[]
   selectedItemId?: string
   exportSettings: { format: 'mp4' | 'webm'; repeatCount: number }
+}
+
+type LegacyMotionItem = Omit<MotionItem, 'kind'> & { source?: boolean; empty?: boolean }
+type LegacyCharacterProject = Omit<CharacterProject, 'legacyArchiveData'> & {
+  parts: unknown[]
+  parameters: unknown[]
+  clips: unknown[]
 }
 
 const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/webp']
 const allowedPresets = ['sway', 'bounce', 'nod', 'float', 'swing', 'pulse', 'wobble', 'breathe', 'shake']
 const allowedMorphModes = ['wave', 'bend', 'ripple', 'flutter', 'pinch']
+export const maxPortableProjectFileBytes = 100 * 1024 * 1024
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
-function isMotionItem(value: unknown): value is MotionItem {
+function isMotionItem(value: unknown): value is LegacyMotionItem {
   if (typeof value !== 'object' || value === null) return false
   const item = value as Record<string, unknown>
   if (typeof item.id !== 'string' || typeof item.name !== 'string' || typeof item.visible !== 'boolean') return false
@@ -27,6 +36,8 @@ function isMotionItem(value: unknown): value is MotionItem {
   if (item.source !== undefined && typeof item.source !== 'boolean') return false
   if (item.empty !== undefined && typeof item.empty !== 'boolean') return false
   if (item.source === true && item.empty === true) return false
+  if (item.source === true && item.imageDataUrl !== undefined) return false
+  if (item.empty === true && (item.imageDataUrl !== undefined || item.points !== undefined)) return false
   if (item.imageDataUrl !== undefined && (typeof item.imageDataUrl !== 'string'
     || !/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=\r\n]+$/.test(item.imageDataUrl))) return false
   for (const key of ['imageWidth', 'imageHeight'] as const) {
@@ -47,7 +58,7 @@ function isMotionItem(value: unknown): value is MotionItem {
   return true
 }
 
-function isCharacterProject(value: unknown): value is CharacterProject {
+function isCharacterProject(value: unknown): value is LegacyCharacterProject {
   if (typeof value !== 'object' || value === null) return false
   const project = value as Record<string, unknown>
   if (project.schemaVersion !== 1 || typeof project.id !== 'string' || typeof project.name !== 'string') return false
@@ -61,24 +72,59 @@ function isCharacterProject(value: unknown): value is CharacterProject {
     && Array.isArray(project.parts) && Array.isArray(project.parameters) && Array.isArray(project.clips)
 }
 
-export function serializePortableProjectFile(
-  project: CharacterProject,
+function serializePortableProjectFile(
+  document: EditorDocument,
   sourceImageDataUrl: string,
-  items: MotionItem[],
-  selectedItemId: string | undefined,
-  exportSettings: PortableProjectFile['exportSettings'],
-): Uint8Array {
-  const archive: PortableProjectFile = { format: 'letmorph-studio-project', formatVersion: 1, project, sourceImageDataUrl, items, selectedItemId, exportSettings }
-  return new TextEncoder().encode(JSON.stringify(archive))
+): string {
+  if (!document.project) throw new Error('저장할 프로젝트가 없습니다.')
+  const archive: PortableProjectFile = {
+    format: 'letmorph-studio-project', formatVersion: 1,
+    project: toLegacyCharacterProject(document.project), sourceImageDataUrl,
+    items: document.layers.items.map(toLegacyMotionItem), selectedItemId: document.layers.selectedItemId,
+    exportSettings: document.exportSettings,
+  }
+  return JSON.stringify(archive)
 }
 
-/** Read the portable project at its file boundary so size limits apply before parsing. */
-export async function readPortableProjectFile(file: File): Promise<{ archive: PortableProjectFile; sourceImage: File }> {
-  if (file.size > 100 * 1024 * 1024) throw new Error('작업 파일은 100MB 이하여야 합니다.')
-  return parsePortableProjectFile(await file.text())
+function toLegacyCharacterProject(project: CharacterProject): LegacyCharacterProject {
+  const { legacyArchiveData, ...metadata } = project
+  return {
+    ...metadata,
+    parts: legacyArchiveData?.parts ?? [],
+    parameters: legacyArchiveData?.parameters ?? [],
+    clips: legacyArchiveData?.clips ?? [],
+  }
 }
 
-export function parsePortableProjectFile(contents: string): { archive: PortableProjectFile; sourceImage: File } {
+/** Keep the v1 archive shape stable while the runtime model uses an explicit layer kind. */
+function toLegacyMotionItem(item: MotionItem): LegacyMotionItem {
+  const { kind, ...legacy } = item
+  if (kind === 'source') return { ...legacy, source: true }
+  if (kind === 'empty') return { ...legacy, empty: true }
+  return legacy
+}
+
+function fromLegacyMotionItem(item: LegacyMotionItem): MotionItem {
+  const { source, empty, ...data } = item
+  const kind = source ? 'source' : empty ? 'empty' : item.imageDataUrl ? 'image' : 'cutout'
+  return { ...data, kind }
+}
+
+/** Build the complete portable output from the runtime document and a platform-provided source image reader. */
+export async function exportPortableProjectFile(
+  document: EditorDocument,
+  sourceImageUrl: string,
+  readSourceImage: (url: string) => Promise<string>,
+): Promise<{ contents: string; fileName: string }> {
+  if (!document.project || !sourceImageUrl) throw new Error('저장할 프로젝트나 원본 이미지가 없습니다.')
+  const sourceImageDataUrl = await readSourceImage(sourceImageUrl)
+  const fileName = `${document.project.name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_')}.letmorph`
+  return { contents: serializePortableProjectFile(document, sourceImageDataUrl), fileName }
+}
+
+/** Decode the legacy v1 file shape into the runtime document without browser or Electron APIs. */
+export function deserializePortableProjectFile(contents: string, fileSizeBytes: number): { document: EditorDocument; sourceImageDataUrl: string } {
+  if (fileSizeBytes > maxPortableProjectFileBytes) throw new Error('작업 파일은 100MB 이하여야 합니다.')
   let parsed: unknown
   try { parsed = JSON.parse(contents) } catch { throw new Error('작업 파일을 읽을 수 없습니다. 파일이 손상되었는지 확인해 주세요.') }
   if (typeof parsed !== 'object' || parsed === null) throw new Error('Letmorph Studio 작업 파일이 아닙니다.')
@@ -99,25 +145,27 @@ export function parsePortableProjectFile(contents: string): { archive: PortableP
   if (typeof archive.sourceImageDataUrl !== 'string') throw new Error('작업 파일에 원본 이미지가 없습니다.')
   const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=\r\n]+)$/.exec(archive.sourceImageDataUrl)
   if (!match || match[1] !== archive.project.sourceImage.mimeType) throw new Error('작업 파일의 원본 이미지 형식이 올바르지 않습니다.')
-  let binary: string
-  try { binary = atob(match[2].replace(/\s/g, '')) } catch { throw new Error('작업 파일의 원본 이미지 데이터를 읽을 수 없습니다.') }
-  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0))
-  if (bytes.byteLength === 0 || bytes.byteLength > 50 * 1024 * 1024) throw new Error('작업 파일의 원본 이미지는 50MB 이하여야 합니다.')
-  const project = archive.project
-  const sourceImage = new File([bytes], project.sourceImage.fileName, { type: project.sourceImage.mimeType })
+  const base64 = match[2].replace(/\s/g, '')
+  if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(base64)) {
+    throw new Error('작업 파일의 원본 이미지 데이터를 읽을 수 없습니다.')
+  }
+  const padding = base64.endsWith('==') ? 2 : base64.endsWith('=') ? 1 : 0
+  const sourceImageBytes = Math.floor(base64.length * 3 / 4) - padding
+  if (sourceImageBytes <= 0 || sourceImageBytes > 50 * 1024 * 1024) throw new Error('작업 파일의 원본 이미지는 50MB 이하여야 합니다.')
+  const { parts, parameters, clips, ...projectMetadata } = archive.project
+  const project: CharacterProject = {
+    ...projectMetadata,
+    legacyArchiveData: { parts, parameters, clips },
+  }
   return {
-    archive: {
-      format: 'letmorph-studio-project',
-      formatVersion: 1,
+    document: {
       project,
-      sourceImageDataUrl: archive.sourceImageDataUrl,
-      items: archive.items,
-      selectedItemId: typeof archive.selectedItemId === 'string' ? archive.selectedItemId : undefined,
+      layers: { items: (archive.items as LegacyMotionItem[]).map(fromLegacyMotionItem), selectedItemId: typeof archive.selectedItemId === 'string' ? archive.selectedItemId : undefined, history: [] },
       exportSettings: {
         format: exportSettings.format as 'mp4' | 'webm',
         repeatCount: Math.floor(exportSettings.repeatCount),
       },
     },
-    sourceImage,
+    sourceImageDataUrl: archive.sourceImageDataUrl,
   }
 }

@@ -1,5 +1,6 @@
 ﻿import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent, type KeyboardEvent, type WheelEvent } from 'react'
-import type { ImageMotionSettings, MotionItem } from '../engine/evaluateImageMotion'
+import type { ImageMotionSettings } from '../engine/evaluateImageMotion'
+import type { MotionItem } from '../domain/motionItem'
 import { normalizedPolygonPath, smoothClosedPolygon } from '../engine/smoothPolygon'
 import { startMotionPreview } from '../platform/browser/canvasMotionRenderer'
 import { getWorkspaceDimensions, WORKSPACE_CONTENT_RATIO, WORKSPACE_MARGIN_RATIO } from '../engine/workspaceLayout'
@@ -135,7 +136,7 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
     event.preventDefault()
     const canvas = canvasRef.current
     const item = items.find(value => value.id === selectedItemId)
-    if (!canvas || !item || item.empty) return
+    if (!canvas || !item || item.kind === 'empty') return
     const rect = canvas.getBoundingClientRect()
     onBeginItemMove()
     event.currentTarget.setPointerCapture(event.pointerId)
@@ -213,7 +214,7 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, canvasWidth,
         }}
         onPointerMove={event => { if (tool === 'pen' && draft.current.length) setCursor(pointFromEvent(event)) }}
         onKeyDown={handleKeyDown}>
-        {showGuides && items.filter(item => !item.empty).map(item => <path key={item.id} d={getItemOutline(item)} className={`item-outline ${selectedItemId === item.id ? 'active' : ''} ${item.visible ? '' : 'hidden'}`} />)}
+        {showGuides && items.filter(item => item.kind !== 'empty').map(item => <path key={item.id} d={getItemOutline(item)} className={`item-outline ${selectedItemId === item.id ? 'active' : ''} ${item.visible ? '' : 'hidden'}`} />)}
         {showGuides && boundaryEdit && selectedItemId && items.find(item => item.id === selectedItemId)?.points?.map((point, index) => {
           const item = items.find(value => value.id === selectedItemId)!
           const assetWidth = item.imageWidth ?? imageWidth, assetHeight = item.imageHeight ?? imageHeight

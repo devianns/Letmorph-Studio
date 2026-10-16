@@ -1,4 +1,4 @@
-import type { MotionItem, ImageMotionPreset } from '../engine/evaluateImageMotion'
+import type { MotionItem, MotionItemUpdate, ImageMotionPreset } from './motionItem'
 
 /** Editable layer state. This is the single source of truth for layer order, selection and undo. */
 export interface LayerDocument {
@@ -12,7 +12,8 @@ export type LayerCommand =
   | { type: 'clear' }
   | { type: 'select'; id?: string }
   | { type: 'add'; item: MotionItem; select?: boolean }
-  | { type: 'update'; id: string; changes: Partial<MotionItem>; checkpoint?: boolean }
+  | { type: 'update'; id: string; changes: MotionItemUpdate; checkpoint?: boolean }
+  | { type: 'set-region'; id: string; points?: NonNullable<MotionItem['points']>; edgeSmoothing: number; edgeFeather: number }
   | { type: 'remove'; id: string }
   | { type: 'remove-all' }
   | { type: 'move'; id: string; direction: -1 | 1 }
@@ -72,6 +73,21 @@ export function reduceLayerDocument(document: LayerDocument, command: LayerComma
         history: command.checkpoint ? checkpoint(document) : document.history,
       }
     }
+    case 'set-region': {
+      const target = document.items.find(item => item.id === command.id)
+      if (!target) return document
+      return {
+        ...document,
+        items: document.items.map(item => item.id === command.id ? {
+          ...item,
+          kind: item.kind === 'empty' ? 'cutout' : item.kind,
+          points: command.points,
+          edgeSmoothing: command.edgeSmoothing,
+          edgeFeather: command.edgeFeather,
+        } : item),
+        history: checkpoint(document),
+      }
+    }
     case 'remove': {
       if (!document.items.some(item => item.id === command.id)) return document
       const items = document.items.filter(item => item.id !== command.id)
@@ -88,7 +104,7 @@ export function reduceLayerDocument(document: LayerDocument, command: LayerComma
       return { ...document, items, history: checkpoint(document) }
     }
     case 'restore-source': {
-      if (document.items.some(item => item.source)) return document
+      if (document.items.some(item => item.kind === 'source')) return document
       const items = [command.item, ...document.items]
       return { items, selectedItemId: command.item.id, history: checkpoint(document) }
     }
@@ -103,10 +119,10 @@ export function reduceLayerDocument(document: LayerDocument, command: LayerComma
 }
 
 export function createMotionItem(id: string, name: string, kind: 'empty' | 'source' | 'image'): MotionItem {
-  const base = { id, name, preset: 'sway' as ImageMotionPreset, amount: kind === 'empty' ? 65 : 45, speed: 1,
+  const base = { id, name, kind, preset: 'sway' as ImageMotionPreset, amount: kind === 'empty' ? 65 : 45, speed: 1,
     horizontal: 100, vertical: 100, rotation: 100, scale: 100, visible: true }
-  if (kind === 'source') return { ...base, source: true }
-  if (kind === 'empty') return { ...base, empty: true, edgeSmoothing: 0, edgeFeather: 0, trailCount: 0 }
+  if (kind === 'source') return { ...base }
+  if (kind === 'empty') return { ...base, edgeSmoothing: 0, edgeFeather: 0, trailCount: 0 }
   return { ...base, sizeMultiplier: 1, positionX: 0, positionY: 0, trailCount: 0 }
 }
 

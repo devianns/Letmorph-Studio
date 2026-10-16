@@ -1,4 +1,4 @@
-import type { MotionItem, SpatialMorphMode } from './evaluateImageMotion'
+import type { MotionItem, SpatialMorphMode } from '../domain/motionItem'
 
 export interface MorphOffset { x: number; y: number }
 

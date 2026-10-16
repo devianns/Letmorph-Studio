@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import type { ImageMotionSettings } from '../../engine/evaluateImageMotion'
-import { downloadBlob } from '../../platform/browser/downloadFile'
 import { recordVideo } from '../../platform/browser/recordVideo'
+import { saveVideoFile } from '../../platform/browser/videoFileTransfer'
 
 export function useAnimationExport() {
   const [isExporting, setIsExporting] = useState(false)
@@ -22,18 +22,8 @@ export function useAnimationExport() {
         format,
       }, setProgress)
 
-      const extension = blob.type.toLowerCase().startsWith(`video/${format}`) ? format : undefined
-      if (!extension) throw new Error(`영상이 ${format.toUpperCase()} 형식으로 만들어지지 않았습니다. 다시 시도해 주세요.`)
-      const fileName = `my-moving-character.${extension}`
-
-      if (window.desktop) {
-        const bytes = new Uint8Array(await blob.arrayBuffer())
-        const result = await window.desktop.saveAnimation(bytes, fileName, extension)
-        if (result.cancelled) return
-      } else {
-        downloadBlob(blob, fileName)
-      }
-      setSaved(true)
+      const fileName = `my-moving-character.${format}`
+      setSaved(await saveVideoFile(blob, fileName, format))
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '저장에 실패했어요. 다시 시도해 주세요.')
     } finally {

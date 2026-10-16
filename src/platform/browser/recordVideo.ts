@@ -1,4 +1,5 @@
-import type { ImageMotionSettings, MotionItem } from '../../engine/evaluateImageMotion'
+import type { ImageMotionSettings } from '../../engine/evaluateImageMotion'
+import type { MotionItem } from '../../domain/motionItem'
 import { preloadMotionImages, renderMotionFrame } from './canvasMotionRenderer'
 import { WORKSPACE_SCALE } from '../../engine/workspaceLayout'
 import { BufferTarget, CanvasSource, Mp4OutputFormat, Output, Quality, canEncodeVideo } from 'mediabunny'

@@ -13,7 +13,7 @@ LayerDocument + source image + canvas size + timestamp
   → preview canvas or video encoder
 ```
 
-- `src/engine/evaluateImageMotion.ts` evaluates deterministic whole-layer procedural motion from a time, preset, amount, speed, and axis tuning.
+- `src/domain/motionItem.ts` defines stable editable layer and motion data. `src/engine/evaluateImageMotion.ts` evaluates deterministic whole-layer motion from a time, preset, amount, speed, and axis tuning.
 - `src/engine/evaluateSpatialMorph.ts` computes deterministic spatial deformation for supported polygon/image regions.
 - `src/engine/smoothPolygon.ts` and `src/engine/clipPolygon.ts` hold geometry operations independent of React.
 - `src/platform/browser/canvasMotionRenderer.ts` composites the source and editable image layers, applies masks, trails, and deformation, and owns render caches.
@@ -24,11 +24,11 @@ The evaluator is deterministic for the same inputs and timestamp. Preview is int
 
 ## Current image and layer model
 
-The source image is a full raster. A layer can reference the source image, contain an additional embedded image, or be an empty user-created target. A normalized closed polygon, when present, masks pixels from that layer's image. Selected pixels render as a moving copy above the unchanged source/composite.
+The source image is a full raster. Each layer has one explicit kind: `source` is the source underlay/selection, `empty` is a manually created target awaiting a region, `cutout` is a source-backed moving region, and `image` is an imported raster. A normalized closed polygon, when present, masks pixels from that layer's image. Selected pixels render as a moving copy above the unchanged source/composite. The domain reducer owns the transition from empty to cutout; generic property edits cannot change a layer kind.
 
 This is a 2D cutout overlay technique, not skeletal rigging. It preserves the original and avoids making holes, but it cannot synthesize hidden artwork. At large offsets, duplicated edges or visible underlying artwork may look unnatural. The engine must not imply otherwise.
 
-The editor's `LayerDocument` now owns ordered layers, selection and undo snapshots through pure TypeScript commands. `MotionItem` remains the renderer's motion-bearing layer data. The older `CharacterPart`/`MotionClip` types are not connected to this runtime and are only scaffolding.
+The editor's `EditorDocument` is the runtime aggregate for project metadata, layer state/history, and export preferences. Its nested `LayerDocument` owns ordered layers, selection and undo snapshots through pure TypeScript commands. `MotionItem` is a domain type consumed by persistence and rendering; the engine no longer defines the persisted layer schema. The previous skeletal clip evaluator was unused and has been removed. Existing `.letmorph` v1 `parts`/`parameters`/`clips` fields are retained opaquely by the persistence adapter so opening and saving an old project does not discard them.
 
 ## Extension rules
 
@@ -43,7 +43,7 @@ The editor's `LayerDocument` now owns ordered layers, selection and undo snapsho
 ## Planned evolution
 
 1. Define a single versioned editor document that contains canvas/source metadata, stable layer records, layer assets/masks, and export preferences. Migrate `.letmorph` v1 explicitly.
-2. Use a discriminated layer kind instead of optional `source`/`empty` booleans once migration and compositor roles are designed. Make every user-facing edit capability consistent across kinds.
+2. Add a formal multi-version archive migration registry when changing the persisted `.letmorph` shape. The current runtime kind is translated to/from the existing v1 format without changing that shape.
 3. Add brush/erase boundary editing and optional overdraw repair as explicit, reversible image operations.
 4. Consider mesh deformation, parent-child transforms, and timeline tracks only after project persistence and runtime evaluation use one model.
 5. Evaluate libraries and redistribution obligations before adopting a new renderer or encoder. Preserve a documented dependency inventory for commercial distribution.

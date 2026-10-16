@@ -1,4 +1,5 @@
-import { evaluateImageMotion, type MotionItem, type ImageMotionSettings } from '../../engine/evaluateImageMotion'
+import { evaluateImageMotion, type ImageMotionSettings } from '../../engine/evaluateImageMotion'
+import type { MotionItem } from '../../domain/motionItem'
 import { smoothClosedPolygon } from '../../engine/smoothPolygon'
 import { evaluateSpatialMorph } from '../../engine/evaluateSpatialMorph'
 import { getWorkspaceContentRect, WORKSPACE_SCALE } from '../../engine/workspaceLayout'
@@ -162,7 +163,7 @@ function drawItemAt(
   if (!layerImage) return
   const width = layerImage.naturalWidth * imageRect.width / canvasWidth
   const height = layerImage.naturalHeight * imageRect.height / canvasHeight
-  const patch = (item.source && !item.points?.length) || (item.imageDataUrl && !item.points?.length)
+  const patch = ((item.kind === 'source' || item.kind === 'image') && !item.points?.length)
     ? layerImage
     : getItemPatch(layerImage, item, width, height)
   if (!patch || alpha <= 0) return
@@ -232,7 +233,7 @@ export function renderMotionFrame(
   const imageRect = getWorkspaceContentRect(canvas.width, canvas.height)
   const activeMasks = new Map<HTMLImageElement, Set<string>>()
   for (const item of items) {
-    if (!item.visible || (item.source && (!item.points || item.points.length < 3)) || item.empty || (item.imageDataUrl && !item.points?.length)
+    if (!item.visible || (item.kind === 'source' && (!item.points || item.points.length < 3)) || item.kind === 'empty' || (item.kind === 'image' && !item.points?.length)
       || (item.points && item.points.length < 3)) continue
     const layerImage = getItemImage(item, image)
     if (!layerImage) continue
@@ -248,14 +249,14 @@ export function renderMotionFrame(
   }
 
   for (const item of items) {
-    if (!item.visible || item.empty || (!item.source && item.points && item.points.length < 3)) continue
+    if (!item.visible || item.kind === 'empty' || (item.kind !== 'source' && item.points && item.points.length < 3)) continue
     try {
-      if (item.source && item.points && item.points.length >= 3) {
+      if (item.kind === 'source' && item.points && item.points.length >= 3) {
         // Keep the source artwork as an unchanged underlay. Animate only the
         // selected pixels as a masked copy so moving a base-image region never
         // exposes the project background.
         context.drawImage(image, imageRect.x, imageRect.y, imageRect.width, imageRect.height)
-        drawItemWithTrail(context, image, { ...item, source: false }, timeMs, canvasWidth, canvasHeight)
+        drawItemWithTrail(context, image, { ...item, kind: 'cutout' }, timeMs, canvasWidth, canvasHeight)
       } else drawItemWithTrail(context, image, item, timeMs, canvasWidth, canvasHeight)
     } catch (cause) {
       onItemRenderError?.(item, cause)

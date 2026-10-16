@@ -22,8 +22,17 @@ This repository is the starting point for a Windows desktop 2D character motion 
 - The project file is the editable source of truth. Exports are derived artifacts.
 - Treat `docs/architecture.md` as the current module ownership map and `docs/user-flow.md` as the current user-facing behavior source. Mark future proposals as planned; do not describe unused schema types as implemented runtime features.
 - Keep layer identity, ordering, selection, and undo transitions in the pure TypeScript domain model (`src/domain/layerDocument.ts`). React dispatches commands and renders state.
+- Represent layer roles with `MotionItem.kind` and domain commands; do not reintroduce `source`/`empty` runtime flags or let generic property updates change layer kind. Translate the v1 fields only inside the portable-project adapter.
+- Keep the active project, layers, selection/history, and video export preferences together in `src/domain/editorDocument.ts`. Persisted formats are adapters over this runtime document, not parallel UI state collections.
+- Keep pen coordinate conversion and polygon clipping in `src/engine/`; UI forwards input points and displays validation feedback.
+- Keep reusable image-import rules in `src/application/` and browser decoding/URL/File APIs in `src/platform/browser/`; React may coordinate loading state and display the result.
+- Do not access `window.desktop`, `FileReader`, `createImageBitmap`, object URLs, or browser downloads directly from React components/hooks; route them through `src/platform/` adapters.
 - Do not add pass-through wrappers. Move ownership and rules to the correct layer; an application module must coordinate a meaningful workflow or enforce a boundary.
+- Keep project import/export composition in `src/application/portableProjectFile.ts`; that module works with strings and domain data only. Browser file reads, image decoding, text encoding, and downloads belong to `src/platform/browser/`.
 - When replacing an architecture, update consumers and persisted-project migration together. Do not leave two competing runtime models.
+- `.letmorph` already has `formatVersion`; add a migration registry when the persisted shape changes. Do not add a duplicate runtime version field without a distinct persisted/runtime compatibility need.
+- For every architecture change, compare the changed code against `docs/architecture.md`, `docs/user-flow.md`, `docs/engine-design.md`, and `docs/roadmap.md`; update only claims affected by that change, in the same work session.
+- Before reporting completion, inspect `README.md` for stale user-facing claims, and record both completed boundaries and remaining architecture debt in the roadmap. Do not mark a structural refactor complete while the agreed scope still has unowned responsibilities.
 
 ## Working on the project
 

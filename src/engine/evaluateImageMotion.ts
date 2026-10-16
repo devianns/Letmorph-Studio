@@ -1,13 +1,4 @@
-﻿export type ImageMotionPreset = 'sway' | 'bounce' | 'nod' | 'float' | 'swing' | 'pulse' | 'wobble' | 'breathe' | 'shake'
-
-export type SpatialMorphMode = 'wave' | 'bend' | 'ripple' | 'flutter' | 'pinch'
-
-export interface MotionTuning {
-  horizontal?: number
-  vertical?: number
-  rotation?: number
-  scale?: number
-}
+import type { ImageMotionPose, MotionItem, MotionTuning, ImageMotionPreset } from '../domain/motionItem'
 
 export interface ImageMotionSettings extends MotionTuning {
   preset: ImageMotionPreset
@@ -17,49 +8,6 @@ export interface ImageMotionSettings extends MotionTuning {
   canvasWidth?: number
   canvasHeight?: number
   items?: MotionItem[]
-}
-
-export interface MotionItem extends MotionTuning {
-  id: string
-  name: string
-  /** Undefined means the whole source image. Otherwise points are normalized to image bounds. */
-  points?: Array<{ x: number; y: number }>
-  /** The input image itself is the bottom/source layer; other whole-image items are copies above it. */
-  source?: boolean
-  /** Empty manually created layer; it has no image content until a region is drawn. */
-  empty?: boolean
-  /** Additional image layer stored as an embedded data URL in the project file. */
-  imageDataUrl?: string
-  imageWidth?: number
-  imageHeight?: number
-  /** Position offset from the canvas center, expressed as a percent of canvas size. */
-  positionX?: number
-  positionY?: number
-  preset: ImageMotionPreset
-  amount: number
-  speed: number
-  visible: boolean
-  trailCount?: number
-  trailIntervalMs?: number
-  trailOpacity?: number
-  trailFade?: number
-  edgeSmoothing?: number
-  edgeFeather?: number
-  /** Optional local mesh deformation, independent from the whole-item pose. */
-  morphMode?: SpatialMorphMode
-  morphAmount?: number
-  morphAngle?: number
-  morphFrequency?: number
-  /** Negative favors the left side, positive favors the right side. */
-  morphWidthBias?: number
-  sizeMultiplier?: number
-}
-
-export interface ImageMotionPose {
-  x: number
-  y: number
-  rotation: number
-  scale: number
 }
 
 /** Deterministic pose. The same timestamp and settings always produce the same pose. */

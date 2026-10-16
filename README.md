@@ -6,15 +6,14 @@ The repository is at the early prototype stage. The first complete path imports 
 
 ## Current status
 
-The initial end-to-end prototype is implemented: import PNG/JPEG/WebP and get an active `기본 이미지` item immediately, then add whole-image copies or pen-drawn regions as additional motion items. The work area adds 25% movement margin around every side of the source art. Manage items in a list, select from nine motion presets, tune horizontal/vertical movement, rotation, scale, amount, and speed, add up to 32 per-item motion trails, and smooth polygon corners and mask edges. Edge feathering stays inside the original pen boundary. Preview and save a user-selected MP4 or WebM cycle when supported by Chromium, at up to 1920px and 60fps with a high recording bitrate. Choose 1–25 repetitions of the 2.4-second cycle (up to 60 seconds). Export and reopen a `.letmorph` project file containing the source image, items, and export preferences. A guide toggle hides selection outlines and editor overlays while previewing. GIF export, polygon point editing, and Windows packaging remain future work.
+The initial end-to-end prototype is implemented: import PNG/JPEG/WebP and get an active source-image layer, then manually add empty or imported-image layers. Pen drawing edits only the selected layer; drawing does not create layers automatically. The work area adds movement margin around the source art. Manage items in a list, choose from nine motion presets, tune movement and spatial morphing, add up to 32 per-item motion trails, and edit polygon boundaries and mask edges. Preview and save MP4 or WebM when supported, up to 1920px and 60fps. Repeat count has no fixed cycle-count cap; estimated and actual output size are limited to 512MB. Export and reopen a `.letmorph` project containing the source image, layers, and export preferences. See [the current user flow](docs/user-flow.md) for limitations and [the roadmap](docs/roadmap.md) for remaining work. Windows installer packaging is not configured.
 
 ## Planned workflow
 
-1. Add a picture and keep the original safe.
-2. Let the app prepare a movable character, with simple ways to fix its suggestions.
-3. Choose a movement or make a few easy adjustments.
-4. Preview the character and make it feel right.
-5. Save the project or export a moving image such as a GIF or video.
+1. Add a picture and preserve it as the source layer.
+2. Add/select a layer, then apply motion to the full image or draw a closed region on that layer.
+3. Adjust motion and layer properties, then review the composite in the preview.
+4. Save the editable `.letmorph` project or export an MP4/WebM video.
 
 ## Development
 

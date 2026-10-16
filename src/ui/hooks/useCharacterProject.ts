@@ -2,7 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createCharacterProject } from '../../application/createCharacterProject'
 import type { CharacterProject } from '../../domain/project'
 import { ImageInputError } from '../../core/image/validateImage'
-import { createBrowserImagePreview, inspectBrowserImage, releaseBrowserImagePreview } from '../../platform/browser/inspectImage'
+import { deserializePortableProjectFile, maxPortableProjectFileBytes } from '../../application/portableProjectFile'
+import type { EditorDocument } from '../../domain/editorDocument'
+import { createBrowserFileFromDataUrl, createBrowserImagePreview, inspectBrowserImage, readBrowserFileText, releaseBrowserImagePreview } from '../../platform/browser/inspectImage'
 
 const errorMessages: Record<string, string> = {
   UNSUPPORTED_TYPE: 'PNG, JPG 또는 WebP 그림을 선택해 주세요.',
@@ -12,7 +14,6 @@ const errorMessages: Record<string, string> = {
 }
 
 export function useCharacterProject() {
-  const [project, setProject] = useState<CharacterProject>()
   const [imageUrl, setImageUrl] = useState<string>()
   const [error, setError] = useState<string>()
   const [isLoading, setIsLoading] = useState(false)
@@ -44,7 +45,6 @@ export function useCharacterProject() {
       const nextUrl = createBrowserImagePreview(file)
       if (previewRef.current) releaseBrowserImagePreview(previewRef.current)
       previewRef.current = nextUrl
-      setProject(nextProject)
       setImageUrl(nextUrl)
       return nextProject
     } catch (cause) {
@@ -57,19 +57,35 @@ export function useCharacterProject() {
     }
   }, [])
 
+  const importProjectFile = useCallback(async (file?: File): Promise<EditorDocument | undefined> => {
+    if (!file) return undefined
+    const sequence = ++importSequence.current
+    setError(undefined)
+    setIsLoading(true)
+    try {
+      const fileContents = await readBrowserFileText(file, maxPortableProjectFileBytes)
+      const { document, sourceImageDataUrl } = deserializePortableProjectFile(fileContents, file.size)
+      if (sequence !== importSequence.current) return undefined
+      if (!document.project) throw new Error('작업 파일에 프로젝트 정보가 없습니다.')
+      const sourceImage = createBrowserFileFromDataUrl(sourceImageDataUrl, document.project.sourceImage.fileName, document.project.sourceImage.mimeType)
+      const restoredProject = await importImage(sourceImage, document.project)
+      return restoredProject ? { ...document, project: restoredProject } : undefined
+    } catch (cause) {
+      if (sequence === importSequence.current) setError(cause instanceof Error ? cause.message : '작업 파일을 가져오지 못했습니다.')
+      return undefined
+    } finally {
+      if (sequence === importSequence.current) setIsLoading(false)
+    }
+  }, [importImage])
+
   const clearProject = useCallback(() => {
     importSequence.current += 1
     if (previewRef.current) releaseBrowserImagePreview(previewRef.current)
     previewRef.current = undefined
-    setProject(undefined)
     setImageUrl(undefined)
     setError(undefined)
     setIsLoading(false)
   }, [])
 
-  const resizeCanvas = useCallback((width: number, height: number) => {
-    setProject(current => current ? { ...current, canvas: { width, height } } : current)
-  }, [])
-
-  return { project, imageUrl, error, isLoading, importImage, clearProject, resizeCanvas }
+  return { imageUrl, error, isLoading, importImage, importProjectFile, clearProject }
 }
