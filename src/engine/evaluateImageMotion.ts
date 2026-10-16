@@ -1,6 +1,6 @@
 ﻿export type ImageMotionPreset = 'sway' | 'bounce' | 'nod' | 'float' | 'swing' | 'pulse' | 'wobble' | 'breathe' | 'shake'
 
-export type SpatialMorphMode = 'wave' | 'bend' | 'ripple'
+export type SpatialMorphMode = 'wave' | 'bend' | 'ripple' | 'flutter' | 'pinch'
 
 export interface MotionTuning {
   horizontal?: number
@@ -41,6 +41,7 @@ export interface MotionItem extends MotionTuning {
   morphFrequency?: number
   /** Negative favors the left side, positive favors the right side. */
   morphWidthBias?: number
+  sizeMultiplier?: number
 }
 
 export interface ImageMotionPose {

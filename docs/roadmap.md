@@ -75,3 +75,6 @@ The product journey and implementation gates are defined in [user-flow.md](user-
 
 
 - [x] 아이템별 공간 모핑: 물결·굽힘·방사형 파동과 방향, 세기, 빈도, 좌우 편차 조절
+
+
+- [x] 숫자열 1 가이드 토글, 아이템 크기 배율(0.5×~2×), 모핑 펄럭임/수축 효과와 원형 펜 마커

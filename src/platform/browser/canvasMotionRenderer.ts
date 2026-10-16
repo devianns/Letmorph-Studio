@@ -73,7 +73,8 @@ function getItemPatch(image: HTMLImageElement, item: MotionItem, width: number, 
 }
 
 function drawSpatialMesh(context: CanvasRenderingContext2D, patch: CanvasImageSource, width: number, height: number, item: MotionItem, timeMs: number): void {
-  const divisions = 12
+  // Fixed low-cost tessellation bounds per-frame work (128 triangles per item).
+  const divisions = 8
   const point = (column: number, row: number) => {
     const u = column / divisions, v = row / divisions
     const offset = evaluateSpatialMorph(u, v, timeMs, width, height, item)
@@ -130,7 +131,8 @@ function drawItemAt(
     context.globalAlpha *= alpha
     context.translate(imageRect.x + pivotX * width + pose.x, imageRect.y + pivotY * height + pose.y)
     context.rotate(pose.rotation)
-    context.scale(pose.scale, pose.scale)
+    const sizeMultiplier = Math.max(0.5, Math.min(2, item.sizeMultiplier ?? 1))
+    context.scale(pose.scale * sizeMultiplier, pose.scale * sizeMultiplier)
     if (item.morphMode && (item.morphAmount ?? 0) > 0) {
       context.translate(-pivotX * width, -pivotY * height)
       drawSpatialMesh(context, patch, width, height, item, timeMs)

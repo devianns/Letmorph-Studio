@@ -155,7 +155,7 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, settings, pl
         onPointerMove={event => { if (tool === 'pen' && draft.current.length) setCursor(pointFromEvent(event)) }}
         onKeyDown={handleKeyDown}>
         {items.map(item => <path key={item.id} d={item.points?.length ? normalizedPolygonPath(smoothClosedPolygon(item.points, item.edgeSmoothing ?? 0)) : fullImagePath} className={`item-outline ${selectedItemId === item.id ? 'active' : ''} ${item.visible ? '' : 'hidden'}`} />)}
-        {boundaryEdit && selectedItemId && items.find(item => item.id === selectedItemId)?.points?.map((point, index) => <circle key={`${selectedItemId}-vertex-${index}`} cx={point.x * 100} cy={point.y * 100} r="1.4" className="boundary-vertex" onPointerDown={event => {
+        {boundaryEdit && selectedItemId && items.find(item => item.id === selectedItemId)?.points?.map((point, index) => <ellipse key={`${selectedItemId}-vertex-${index}`} cx={point.x * 100} cy={point.y * 100} rx={2.2 * 100 / Math.max(1, boardWidth)} ry={2.2 * 100 / Math.max(1, boardHeight)} className="boundary-vertex" onPointerDown={event => {
           if (event.button !== 0) return
           event.preventDefault()
           event.stopPropagation()
@@ -165,8 +165,8 @@ export function CanvasPreview({ sourceUrl, imageWidth, imageHeight, settings, pl
         }} />)}
         {draftPath && <>
           <path d={`${draftPath}${cursor ? ` L ${cursor.x * 100} ${cursor.y * 100}` : ''}`} className="pen-draft" />
-          {draftPoints.map((point, index) => <ellipse key={index} cx={point.x * 100} cy={point.y * 100} rx={1.2 * 100 / imageWidth} ry={1.2 * 100 / imageHeight} className="pen-point" />)}
-          {draftPoints.length >= 3 && <ellipse cx={draftPoints[0].x * 100} cy={draftPoints[0].y * 100} rx={2.5 * 100 / imageWidth} ry={2.5 * 100 / imageHeight} className="close-point" />}
+          {draftPoints.map((point, index) => <ellipse key={index} cx={point.x * 100} cy={point.y * 100} rx={1.8 * 100 / Math.max(1, boardWidth)} ry={1.8 * 100 / Math.max(1, boardHeight)} className="pen-point" />)}
+          {draftPoints.length >= 3 && <ellipse cx={draftPoints[0].x * 100} cy={draftPoints[0].y * 100} rx={2.4 * 100 / Math.max(1, boardWidth)} ry={2.4 * 100 / Math.max(1, boardHeight)} className="close-point" />}
         </>}
       </svg>}
     </div>}

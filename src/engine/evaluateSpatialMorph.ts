@@ -22,7 +22,15 @@ export function evaluateSpatialMorph(
   let displacement = 0
   if (mode === 'wave') displacement = Math.sin(across * Math.PI * frequency * 2 + phase) * amplitude
   else if (mode === 'bend') displacement = Math.sin(phase + across * Math.PI) * across * Math.abs(across) * 4 * amplitude
-  else {
+  else if (mode === 'flutter') {
+    const edgeWeight = Math.abs(across) * 2
+    displacement = Math.sin(phase + across * Math.PI * frequency) * edgeWeight * amplitude
+  } else if (mode === 'pinch') {
+    const rx = u - 0.5, ry = v - 0.5
+    const radius = Math.hypot(rx, ry)
+    const swell = Math.sin(phase) * amplitude * 0.6
+    if (radius > 1e-4) return { x: rx / radius * swell, y: ry / radius * swell }
+  } else {
     const rx = u - 0.5, ry = v - 0.5
     const radius = Math.hypot(rx, ry)
     const wave = Math.sin(radius * Math.PI * frequency * 4 - phase) * amplitude
