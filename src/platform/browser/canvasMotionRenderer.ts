@@ -81,12 +81,12 @@ function getItemPatch(image: HTMLImageElement, item: MotionItem, width: number, 
       maskContext.closePath()
       maskContext.fill()
       if (blur > 0) {
-        // Feather the smoothed edge, then hard-clip it to the user's original
-        // selection so no softened pixels appear outside the drawn boundary.
+        // Feather the final smoothed edge, then hard-clip to that same shape so
+        // softened pixels stay inside the visible selection boundary.
         maskContext.filter = 'none'
         maskContext.globalCompositeOperation = 'destination-in'
         maskContext.beginPath()
-        item.points.forEach((point, index) => {
+        polygon.forEach((point, index) => {
           const x = point.x * mask.width
           const y = point.y * mask.height
           if (index === 0) maskContext.moveTo(x, y)

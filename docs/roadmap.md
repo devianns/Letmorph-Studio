@@ -39,11 +39,12 @@ The product journey and implementation gates are defined in [user-flow.md](user-
 - [x] Add polygon corner smoothing and soft mask-edge controls for pen-selected items.
 - [x] Use the same smoothed polygon for the item guide and rendered mask; cache masks by geometry and edge settings.
 - [x] Record one 2.4-second MP4 or WebM cycle from the shared motion renderer, based on the user's supported format selection.
-- [x] Keep feathered mask pixels inside the original user-drawn selection boundary.
+- [x] Keep feathered mask pixels inside the final smoothed selection boundary.
 - [x] Support up to 32 motion-trail frames per item.
 - [x] Allow 16x canvas zoom and aspect-correct round pen markers.
 - [x] Edit existing pen boundaries by dragging their vertices with undo support.
 - [x] Improve video export resolution, frame rate, resampling, and recorder bitrate.
+- [x] Encode MP4 as H.264 and mux a regular fast-start MP4 container; keep WebM on MediaRecorder and reject unavailable H.264 encoding.
 - [x] Keep derived item-mask caches at render resolution and discard cache entries unused by current items.
 - [x] Isolate item rendering failures so one invalid item cannot stop the preview loop; fail video export with the affected item name.
 - [x] Let users repeat the 2.4-second export cycle up to 25 times (60 seconds total).

@@ -141,7 +141,7 @@ export default function App() {
     const item: MotionItem = {
       id: crypto.randomUUID(), name: `아이템 ${number}`, source: false, empty: true,
       preset: 'sway', amount: 65, speed: 1, horizontal: 100, vertical: 100, rotation: 100, scale: 100,
-      edgeSmoothing: 15, edgeFeather: 0.5, trailCount: 0, visible: true,
+      edgeSmoothing: 0, edgeFeather: 0, trailCount: 0, visible: true,
     }
     commitItems([...items, item])
     setSelectedItemId(item.id)
@@ -230,8 +230,8 @@ export default function App() {
     }))
     commitItems(items.map(item => item.id === target.id ? {
       ...item, points: localPoints, empty: false,
-      edgeSmoothing: item.edgeSmoothing ?? 15,
-      edgeFeather: item.edgeFeather ?? 0.5,
+      edgeSmoothing: item.edgeSmoothing ?? 0,
+      edgeFeather: item.edgeFeather ?? 0,
     } : item))
     setSelectedItemId(target.id)
     setEditTargetId(undefined)
@@ -380,9 +380,10 @@ export default function App() {
           </>}
           {selectedItem.points && <>
             <div className="section-label tuning-heading">선택 영역 다듬기</div>
-            <label className="range-control tuning-control"><span>모서리 다듬기 <b>{selectedItem.edgeSmoothing ?? 0}%</b></span><input type="range" min="0" max="100" value={selectedItem.edgeSmoothing ?? 0} onPointerDown={rememberItems} onKeyDown={event => { if (event.key.startsWith('Arrow')) rememberItems() }} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, edgeSmoothing: Number(event.target.value) } : item))} /></label>
-            <label className="range-control tuning-control"><span>경계 부드럽게 <b>{(selectedItem.edgeFeather ?? 0).toFixed(1)}%</b></span><input type="range" min="0" max="3" step="0.1" value={selectedItem.edgeFeather ?? 0} onPointerDown={rememberItems} onKeyDown={event => { if (event.key.startsWith('Arrow')) rememberItems() }} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, edgeFeather: Number(event.target.value) } : item))} /></label>
-            <p className="selection-hint">모서리 다듬기는 꼭짓점을 깎아 선을 부드럽게 하고, 경계 부드럽게는 이미지 크기에 비례해 가장자리를 흐립니다.</p>
+            <label className="range-control tuning-control"><span>모서리 둥글게 <b>{selectedItem.edgeSmoothing ?? 0}%</b></span><input type="range" min="0" max="100" value={selectedItem.edgeSmoothing ?? 0} onPointerDown={rememberItems} onKeyDown={event => { if (event.key.startsWith('Arrow')) rememberItems() }} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, edgeSmoothing: Number(event.target.value) } : item))} /></label>
+            <p className="selection-hint">그린 다각형의 꼭짓점을 둥글게 깎습니다. 0%면 그린 경계를 그대로 사용합니다.</p>
+            <label className="range-control tuning-control"><span>안쪽 경계 흐림 <b>{(selectedItem.edgeFeather ?? 0).toFixed(1)}%</b></span><input type="range" min="0" max="3" step="0.1" value={selectedItem.edgeFeather ?? 0} onPointerDown={rememberItems} onKeyDown={event => { if (event.key.startsWith('Arrow')) rememberItems() }} onChange={event => setItems(current => current.map(item => item.id === selectedItem.id ? { ...item, edgeFeather: Number(event.target.value) } : item))} /></label>
+            <p className="selection-hint">선 안쪽 픽셀만 투명하게 섞어 경계를 흐립니다. 선택한 영역 바깥으로 번지지 않습니다. 0%면 흐림이 없습니다.</p>
           </>}
           {selectedItem.points && <>
             <button className="selection-button edit-region" onClick={() => { setBoundaryEdit(false); setEditTargetId(selectedItem.id); setTool('pen') }}>펜으로 영역 다시 그리기</button>
