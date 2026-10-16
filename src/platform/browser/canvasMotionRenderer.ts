@@ -1,5 +1,6 @@
 import { evaluateImageMotion, type MotionItem, type ImageMotionSettings } from '../../engine/evaluateImageMotion'
 import { smoothClosedPolygon } from '../../engine/smoothPolygon'
+import { evaluateSpatialMorph } from '../../engine/evaluateSpatialMorph'
 import { getWorkspaceContentRect, WORKSPACE_SCALE } from '../../engine/workspaceLayout'
 
 const selectionPatchCache = new WeakMap<HTMLImageElement, Map<string, HTMLCanvasElement>>()
@@ -71,6 +72,34 @@ function getItemPatch(image: HTMLImageElement, item: MotionItem, width: number, 
   return patch
 }
 
+function drawSpatialMesh(context: CanvasRenderingContext2D, patch: CanvasImageSource, width: number, height: number, item: MotionItem, timeMs: number): void {
+  const divisions = 12
+  const point = (column: number, row: number) => {
+    const u = column / divisions, v = row / divisions
+    const offset = evaluateSpatialMorph(u, v, timeMs, width, height, item)
+    return { x: u * width, y: v * height, dx: u * width + offset.x, dy: v * height + offset.y }
+  }
+  const triangle = (a: ReturnType<typeof point>, b: ReturnType<typeof point>, c: ReturnType<typeof point>) => {
+    const det = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y)
+    if (Math.abs(det) < 1e-5) return
+    const ax = ((b.dx - a.dx) * (c.y - a.y) - (c.dx - a.dx) * (b.y - a.y)) / det
+    const cx = ((b.x - a.x) * (c.dx - a.dx) - (c.x - a.x) * (b.dx - a.dx)) / det
+    const ex = a.dx - ax * a.x - cx * a.y
+    const by = ((b.dy - a.dy) * (c.y - a.y) - (c.dy - a.dy) * (b.y - a.y)) / det
+    const dy = ((b.x - a.x) * (c.dy - a.dy) - (c.x - a.x) * (b.dy - a.dy)) / det
+    const fy = a.dy - by * a.x - dy * a.y
+    context.save()
+    context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.lineTo(c.x, c.y); context.closePath(); context.clip()
+    context.transform(ax, by, cx, dy, ex, fy)
+    context.drawImage(patch, 0, 0, width, height)
+    context.restore()
+  }
+  for (let row = 0; row < divisions; row++) for (let column = 0; column < divisions; column++) {
+    const a = point(column, row), b = point(column + 1, row), c = point(column, row + 1), d = point(column + 1, row + 1)
+    triangle(a, b, d); triangle(a, d, c)
+  }
+}
+
 function drawItemAt(
   context: CanvasRenderingContext2D,
   image: HTMLImageElement,
@@ -102,7 +131,10 @@ function drawItemAt(
     context.translate(imageRect.x + pivotX * width + pose.x, imageRect.y + pivotY * height + pose.y)
     context.rotate(pose.rotation)
     context.scale(pose.scale, pose.scale)
-    context.drawImage(patch, -pivotX * width, -pivotY * height, width, height)
+    if (item.morphMode && (item.morphAmount ?? 0) > 0) {
+      context.translate(-pivotX * width, -pivotY * height)
+      drawSpatialMesh(context, patch, width, height, item, timeMs)
+    } else context.drawImage(patch, -pivotX * width, -pivotY * height, width, height)
   } finally {
     context.restore()
   }

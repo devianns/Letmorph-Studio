@@ -153,3 +153,8 @@ This sequence prioritizes a simple working result without AI segmentation or adv
 - [gifenc](https://github.com/mattdesl/gifenc): small JS GIF encoder; verify maintenance/dependency notices before adoption.
 - [Canvas drawImage API](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/drawImage): browser-native source image drawing/cropping used by simple mask/edit tools.
 
+
+
+## Advanced spatial morphing
+
+Each motion item can optionally enable a local mesh deformation independent of its whole-item pose. Wave, bend, and radial modes use deterministic time-based displacement on a 12 by 12 mesh. Direction, strength, spatial frequency, and left-to-right strength bias are item settings and are included automatically in portable project files. The feature is disabled by default; ordinary item motion has no mesh-rendering cost.

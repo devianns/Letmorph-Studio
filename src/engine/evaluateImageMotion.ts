@@ -1,5 +1,7 @@
 ﻿export type ImageMotionPreset = 'sway' | 'bounce' | 'nod' | 'float' | 'swing' | 'pulse' | 'wobble' | 'breathe' | 'shake'
 
+export type SpatialMorphMode = 'wave' | 'bend' | 'ripple'
+
 export interface MotionTuning {
   horizontal?: number
   vertical?: number
@@ -32,6 +34,13 @@ export interface MotionItem extends MotionTuning {
   trailFade?: number
   edgeSmoothing?: number
   edgeFeather?: number
+  /** Optional local mesh deformation, independent from the whole-item pose. */
+  morphMode?: SpatialMorphMode
+  morphAmount?: number
+  morphAngle?: number
+  morphFrequency?: number
+  /** Negative favors the left side, positive favors the right side. */
+  morphWidthBias?: number
 }
 
 export interface ImageMotionPose {

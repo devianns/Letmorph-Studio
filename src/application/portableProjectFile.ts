@@ -13,6 +13,7 @@ export interface PortableProjectFile {
 
 const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/webp']
 const allowedPresets = ['sway', 'bounce', 'nod', 'float', 'swing', 'pulse', 'wobble', 'breathe', 'shake']
+const allowedMorphModes = ['wave', 'bend', 'ripple']
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value)
@@ -24,6 +25,10 @@ function isMotionItem(value: unknown): value is MotionItem {
   if (typeof item.id !== 'string' || typeof item.name !== 'string' || typeof item.visible !== 'boolean') return false
   if (!allowedPresets.includes(String(item.preset)) || !isFiniteNumber(item.amount) || !isFiniteNumber(item.speed)) return false
   if (item.source !== undefined && typeof item.source !== 'boolean') return false
+  if (item.morphMode !== undefined && !allowedMorphModes.includes(String(item.morphMode))) return false
+  for (const [key, min, max] of [['morphAmount', 0, 100], ['morphAngle', 0, 360], ['morphFrequency', 1, 8], ['morphWidthBias', -100, 100]] as const) {
+    if (item[key] !== undefined && (!isFiniteNumber(item[key]) || item[key] < min || item[key] > max)) return false
+  }
   if (item.points !== undefined && (!Array.isArray(item.points) || item.points.length < 3 || item.points.length > 10000
     || !item.points.every(point => typeof point === 'object' && point !== null
       && isFiniteNumber((point as Record<string, unknown>).x) && isFiniteNumber((point as Record<string, unknown>).y)

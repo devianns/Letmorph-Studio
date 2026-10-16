@@ -72,3 +72,6 @@ The product journey and implementation gates are defined in [user-flow.md](user-
 - Prototype deterministic click-to-select, lasso, brush, and superpixel helpers; no AI model dependency is planned. See [engine design](engine-design.md).
 - Evaluate PSD import libraries and fidelity against grouped PSDs, masks, blend modes, and color profiles.
 
+
+
+- [x] 아이템별 공간 모핑: 물결·굽힘·방사형 파동과 방향, 세기, 빈도, 좌우 편차 조절

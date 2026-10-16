@@ -17,3 +17,5 @@
 .preview-board .selection-overlay{left:16.6667%;top:16.6667%;width:66.6667%;height:66.6667%}
 
 .project-file-actions{display:flex;gap:6px;margin-top:8px}.project-file-actions .selection-button{font-size:8px;padding:7px 4px}.project-file-actions .selection-button:disabled{opacity:.4}
+
+.morph-select{display:block;width:100%;margin-top:8px;padding:7px;border:1px solid #383943;border-radius:5px;background:#20212a;color:#e9e8ee;font-size:9px}
